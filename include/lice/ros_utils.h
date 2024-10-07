@@ -1,0 +1,456 @@
+#pragma once
+
+#include "rclcpp/rclcpp.hpp"
+#include "sensor_msgs/msg/point_cloud2.hpp"
+#include "geometry_msgs/msg/transform.hpp"
+
+#include "types.h"
+#include <Eigen/Dense>
+
+template<class T>
+inline void printOption(rclcpp::Node* n, bool user_defined, std::string field, T value)
+{
+    std::stringstream stream;
+    if(user_defined)
+    {
+        stream << "[Param] User defined value for " << field << " is " << value;
+    }
+    else
+    {
+        stream << "[Param] Default value for " << field << " is " << value;
+    }
+    RCLCPP_INFO(n->get_logger(), "%s",stream.str().c_str());
+}
+
+inline void printOptionError(rclcpp::Node* n, std::string field)
+{
+    std::stringstream stream;
+    stream << "[Param] It seems that the parameter " << field << " is not provided";
+    RCLCPP_ERROR(n->get_logger(), "%s",stream.str().c_str());
+    throw std::invalid_argument("Invalid parameter");
+}
+
+template<class T>
+inline T lowLevelReadField(rclcpp::Node* n, std::string field, bool required, T default_value =T())
+{
+    T output;
+    if (n->get_parameter(field, output))
+    {
+        printOption(n, true, field, output);
+    }
+    else
+    {
+        if (required)
+        {
+            printOptionError(n, field);
+        }
+        else
+        {
+            output = default_value;
+            printOption(n, false, field, output);
+        }
+
+    }
+    return output;
+}
+
+
+inline double readRequiredFieldDouble(rclcpp::Node* n, std::string field)
+{
+    n->declare_parameter(field, rclcpp::PARAMETER_DOUBLE);
+    return lowLevelReadField<double>(n, field, true);
+}
+inline double readFieldDouble(rclcpp::Node* n, std::string field, double default_value)
+{
+    n->declare_parameter(field, rclcpp::PARAMETER_DOUBLE);
+    return lowLevelReadField<double>(n, field, false, default_value);
+}
+
+inline int readRequiredFieldInt(rclcpp::Node* n, std::string field)
+{
+    n->declare_parameter(field, rclcpp::PARAMETER_INTEGER);
+    return lowLevelReadField<int>(n, field, true);
+}
+inline int readFieldInt(rclcpp::Node* n, std::string field, int default_value)
+{
+    n->declare_parameter(field, rclcpp::PARAMETER_INTEGER);
+    return lowLevelReadField<int>(n, field, false, default_value);
+}
+
+inline std::string readRequiredFieldString(rclcpp::Node* n, std::string field)
+{
+    n->declare_parameter(field, rclcpp::PARAMETER_STRING);
+    return lowLevelReadField<std::string>(n, field, true);
+}
+inline std::string readFieldString(rclcpp::Node* n, std::string field, std::string default_value)
+{
+    n->declare_parameter(field, rclcpp::PARAMETER_STRING);
+    return lowLevelReadField<std::string>(n, field, false, default_value);
+}
+
+inline bool readRequiredFieldBool(rclcpp::Node* n, std::string field)
+{
+    n->declare_parameter(field, rclcpp::PARAMETER_BOOL);
+    return lowLevelReadField<bool>(n, field, true);
+}
+inline bool readFieldBool(rclcpp::Node* n, std::string field, bool default_value)
+{
+    n->declare_parameter(field, rclcpp::PARAMETER_BOOL);
+    return lowLevelReadField<bool>(n, field, false, default_value);
+}
+
+
+enum PointFieldTypes
+{
+    TIME = 0,
+    INTENSITY = 1,
+    CHANNEL = 2,
+    TYPE = 3,
+    SCAN_ID = 4,
+    DYNAMIC = 5,
+    X = 6,
+    Y = 7,
+    Z = 8,
+    NUM_TYPES = 9
+};
+
+
+
+inline std::vector<std::pair<int, int>> getPointFields(const std::vector<sensor_msgs::msg::PointField>& fields, bool need_time=false)
+{
+    std::vector<std::pair<int,int> > output(PointFieldTypes::NUM_TYPES, {-1, -1});
+    for(size_t i = 0; i < fields.size(); ++i)
+    {
+        if((fields[i].name == "time")||(fields[i].name == "point_time_offset")||(fields[i].name == "ts")||(fields[i].name == "t"))
+        {
+            output[PointFieldTypes::TIME] = {fields[i].offset , fields[i].datatype};
+        }
+        else if((fields[i].name == "channel")||(fields[i].name == "ring"))
+        {
+            output[PointFieldTypes::CHANNEL] = {fields[i].offset , fields[i].datatype};
+        }
+        else if(fields[i].name == "intensity")
+        {
+            output[PointFieldTypes::INTENSITY] = {fields[i].offset , fields[i].datatype};
+        }
+        else if(fields[i].name == "type")
+        {
+            output[PointFieldTypes::TYPE] = {fields[i].offset , fields[i].datatype};
+        }
+        else if(fields[i].name == "scan_id")
+        {
+            output[PointFieldTypes::SCAN_ID] = {fields[i].offset , fields[i].datatype};
+        }
+        else if(fields[i].name == "dynamic")
+        {
+            output[PointFieldTypes::DYNAMIC] = {fields[i].offset , fields[i].datatype};
+        }
+        else if(fields[i].name == "x")
+        {
+            output[PointFieldTypes::X] = {fields[i].offset , fields[i].datatype};
+        }
+        else if(fields[i].name == "y")
+        {
+            output[PointFieldTypes::Y] = {fields[i].offset , fields[i].datatype};
+        }
+        else if(fields[i].name == "z")
+        {
+            output[PointFieldTypes::Z] = {fields[i].offset , fields[i].datatype};
+        }
+    }
+    if(need_time&&(output[PointFieldTypes::TIME].first == -1))
+    {
+        std::cout << "The point cloud does not seem to contain timestamp information (field 'time', 'ts', or 'point_time_offset'" << std::endl;
+    }
+    if((output[PointFieldTypes::X].first == -1)||(output[PointFieldTypes::Y].first == -1)||(output[PointFieldTypes::Z].first == -1))
+    {
+        std::cout << "The point cloud seems to miss at least one component (x, y, or z)" << std::endl;
+    }
+    return output;
+}
+
+
+
+template <typename T>
+inline void preparePointCloud2Msg(sensor_msgs::msg::PointCloud2& output, const std::vector<PointTemplated<T>>& pts, const std::string& frame_id, const rclcpp::Time& time)
+{
+    output.header.frame_id = frame_id;
+    output.header.stamp = time;
+    output.width  = pts.size();
+    output.height = 1;
+    output.is_bigendian = false;
+    output.point_step = 37;
+    output.row_step = output.point_step * output.width;
+    output.fields.resize(9);
+
+    output.fields[0].name = "x";
+    output.fields[0].count =1;
+    output.fields[0].offset = 0;
+    output.fields[0].datatype = sensor_msgs::msg::PointField::FLOAT32;
+    output.fields[1].name = "y";
+    output.fields[1].count =1;
+    output.fields[1].offset = 4;
+    output.fields[1].datatype = sensor_msgs::msg::PointField::FLOAT32;
+    output.fields[2].name = "z";
+    output.fields[2].count =1;
+    output.fields[2].offset = 8;
+    output.fields[2].datatype = sensor_msgs::msg::PointField::FLOAT32;
+    output.fields[3].name = "intensity";
+    output.fields[3].count =1;
+    output.fields[3].offset = 12;
+    output.fields[3].datatype = sensor_msgs::msg::PointField::FLOAT32;
+    output.fields[4].name = "t";
+    output.fields[4].count =1;
+    output.fields[4].offset = 16;
+    output.fields[4].datatype = sensor_msgs::msg::PointField::FLOAT64;
+    output.fields[5].name = "scan_id";
+    output.fields[5].count =1;
+    output.fields[5].offset = 24;
+    output.fields[5].datatype = sensor_msgs::msg::PointField::INT32;
+    output.fields[6].name = "channel";
+    output.fields[6].count =1;
+    output.fields[6].offset = 28;
+    output.fields[6].datatype = sensor_msgs::msg::PointField::INT32;
+    output.fields[7].name = "type";
+    output.fields[7].count =1;
+    output.fields[7].offset = 32;
+    output.fields[7].datatype = sensor_msgs::msg::PointField::INT32;
+    output.fields[8].name = "dynamic";
+    output.fields[8].count =1;
+    output.fields[8].offset = 36;
+    output.fields[8].datatype = sensor_msgs::msg::PointField::UINT8;
+
+
+    output.row_step = output.point_step * output.width;
+    output.data.resize(output.point_step*pts.size());
+}
+
+inline sensor_msgs::msg::PointCloud2 ptsVecToPointCloud2MsgInternal(const std::vector<Pointd>& pts, const std::string& frame_id, const rclcpp::Time& time)
+{
+    sensor_msgs::msg::PointCloud2 output;
+    preparePointCloud2Msg(output, pts, frame_id, time);
+    for(size_t i = 0; i < pts.size(); ++i)
+    {
+        float x = (float)pts[i].x;
+        float y = (float)pts[i].y;
+        float z = (float)pts[i].z;
+        memcpy(&(output.data[(output.point_step*i) ]), &(x), sizeof(float));
+        memcpy(&(output.data[(output.point_step*i) + 4]), &(y), sizeof(float));
+        memcpy(&(output.data[(output.point_step*i) + 8]), &(z), sizeof(float));
+        memcpy(&(output.data[(output.point_step*i) + 12]), &(pts[i].i), sizeof(float));
+        memcpy(&(output.data[(output.point_step*i) + 16]), &(pts[i].t), sizeof(double));
+        memcpy(&(output.data[(output.point_step*i) + 24]), &(pts[i].scan_id), sizeof(int));
+        memcpy(&(output.data[(output.point_step*i) + 28]), &(pts[i].channel), sizeof(int));
+        memcpy(&(output.data[(output.point_step*i) + 32]), &(pts[i].type), sizeof(int));
+        output.data[(output.point_step*i) + 36] = pts[i].dynamic;
+    }
+    return output;
+}
+
+inline sensor_msgs::msg::PointCloud2 ptsVecToPointCloud2MsgInternal(const std::vector<Pointd>& pts, const std_msgs::msg::Header& header)
+{
+    return ptsVecToPointCloud2MsgInternal(pts, header.frame_id, rclcpp::Time(header.stamp));
+}
+
+inline sensor_msgs::msg::PointCloud2 ptsVecToPointCloud2MsgInternal(const std::vector<Pointf>& pts, const std::string& frame_id, const rclcpp::Time& time)
+{
+    sensor_msgs::msg::PointCloud2 output;
+    preparePointCloud2Msg(output, pts, frame_id, time);
+    for(size_t i = 0; i < pts.size(); ++i)
+    {
+        memcpy(&(output.data[(output.point_step*i) ]), &(pts[i].x), sizeof(float));
+        memcpy(&(output.data[(output.point_step*i) + 4]), &(pts[i].y), sizeof(float));
+        memcpy(&(output.data[(output.point_step*i) + 8]), &(pts[i].z), sizeof(float));
+        memcpy(&(output.data[(output.point_step*i) + 12]), &(pts[i].i), sizeof(float));
+        memcpy(&(output.data[(output.point_step*i) + 16]), &(pts[i].t), sizeof(double));
+        memcpy(&(output.data[(output.point_step*i) + 24]), &(pts[i].scan_id), sizeof(int));
+        memcpy(&(output.data[(output.point_step*i) + 28]), &(pts[i].channel), sizeof(int));
+        memcpy(&(output.data[(output.point_step*i) + 32]), &(pts[i].type), sizeof(int));
+        output.data[(output.point_step*i) + 36] = pts[i].dynamic;
+    }
+    return output;
+}
+
+inline sensor_msgs::msg::PointCloud2 ptsVecToPointCloud2MsgInternal(const std::vector<Pointf>& pts, const std_msgs::msg::Header& header)
+{
+    return ptsVecToPointCloud2MsgInternal(pts, header.frame_id, rclcpp::Time(header.stamp));
+}
+
+
+
+inline std::vector<Pointd> pointCloud2MsgToPtsVecInternal(const sensor_msgs::msg::PointCloud2::ConstSharedPtr& msg)
+{
+    std::vector<Pointd> output;
+    output.resize(msg->width*msg->height);
+    for(size_t i=0; i < output.size(); ++i)
+    {
+        float temp_x, temp_y, temp_z;
+        memcpy(&(temp_x), &(msg->data[(msg->point_step*i) + 0]), sizeof(float));
+        memcpy(&(temp_y), &(msg->data[(msg->point_step*i) + 4]), sizeof(float));
+        memcpy(&(temp_z), &(msg->data[(msg->point_step*i) + 8]), sizeof(float));
+        output[i].x = (double)temp_x;
+        output[i].y = (double)temp_y;
+        output[i].z = (double)temp_z;
+        memcpy(&(output[i].i), &(msg->data[(msg->point_step*i) + 12]), sizeof(float));
+        memcpy(&(output[i].t), &(msg->data[(msg->point_step*i) + 16]), sizeof(double));
+        memcpy(&(output[i].scan_id), &(msg->data[(msg->point_step*i) + 24]), sizeof(int));
+        memcpy(&(output[i].channel), &(msg->data[(msg->point_step*i) + 28]), sizeof(int));
+        memcpy(&(output[i].type), &(msg->data[(msg->point_step*i) + 32]), sizeof(int));
+        output[i].dynamic = msg->data[(msg->point_step*i) + 36];
+    }
+    return output;
+}
+
+inline std::vector<Pointf> pointCloud2MsgToPtsVecInternalFloat(const sensor_msgs::msg::PointCloud2::ConstSharedPtr& msg)
+{
+    std::vector<Pointf> output;
+    output.resize(msg->width*msg->height);
+    for(size_t i=0; i < output.size(); ++i)
+    {
+        memcpy(&(output[i].x), &(msg->data[(msg->point_step*i) + 0]), sizeof(float));
+        memcpy(&(output[i].y), &(msg->data[(msg->point_step*i) + 4]), sizeof(float));
+        memcpy(&(output[i].z), &(msg->data[(msg->point_step*i) + 8]), sizeof(float));
+        memcpy(&(output[i].i), &(msg->data[(msg->point_step*i) + 12]), sizeof(float));
+        memcpy(&(output[i].t), &(msg->data[(msg->point_step*i) + 16]), sizeof(double));
+        memcpy(&(output[i].scan_id), &(msg->data[(msg->point_step*i) + 24]), sizeof(int));
+        memcpy(&(output[i].channel), &(msg->data[(msg->point_step*i) + 28]), sizeof(int));
+        memcpy(&(output[i].type), &(msg->data[(msg->point_step*i) + 32]), sizeof(int));
+        output[i].dynamic = msg->data[(msg->point_step*i) + 36];
+    }
+    return output;
+}
+
+// Function to read a PointCloud2 message and convert it to a vector of points
+template <typename T>
+inline std::tuple<std::vector<PointTemplated<T> >, bool, bool> pointCloud2MsgToPtsVec(const sensor_msgs::msg::PointCloud2::ConstSharedPtr& msg, const double time_scale = 1e-9, bool need_time = true)
+{
+    std::vector<PointTemplated<T>> output;
+    output.resize(msg->width*msg->height);
+    std::vector<std::pair<int,int> > fields = getPointFields(msg->fields, need_time);
+    bool has_intensity = (fields[PointFieldTypes::INTENSITY].first != -1);
+    bool has_channel = (fields[PointFieldTypes::CHANNEL].first != -1);
+    bool has_type = (fields[PointFieldTypes::TYPE].first != -1);
+    bool has_scan_id = (fields[PointFieldTypes::SCAN_ID].first != -1);
+    bool has_dynamic = (fields[PointFieldTypes::DYNAMIC].first != -1);
+    bool has_time = (fields[PointFieldTypes::TIME].first != -1);
+    for(size_t i = 0; i < output.size(); ++i)
+    {
+        float temp_x, temp_y, temp_z;
+        memcpy(&(temp_x), &(msg->data[(msg->point_step*i) + fields[PointFieldTypes::X].first]), sizeof(float));
+        memcpy(&(temp_y), &(msg->data[(msg->point_step*i) + fields[PointFieldTypes::Y].first]), sizeof(float));
+        memcpy(&(temp_z), &(msg->data[(msg->point_step*i) + fields[PointFieldTypes::Z].first]), sizeof(float));
+        output[i].x = (T)temp_x;
+        output[i].y = (T)temp_y;
+        output[i].z = (T)temp_z;
+        if(has_time)
+        {
+            if(fields[PointFieldTypes::TIME].second == sensor_msgs::msg::PointField::FLOAT64)
+            {
+                memcpy(&(output[i].t), &(msg->data[(msg->point_step*i) + fields[PointFieldTypes::TIME].first]), sizeof(double));
+            }
+            else if(fields[PointFieldTypes::TIME].second == sensor_msgs::msg::PointField::FLOAT32)
+            {
+                float temp_t;
+                memcpy(&(temp_t), &(msg->data[(msg->point_step*i) + fields[PointFieldTypes::TIME].first]), sizeof(float));
+                output[i].t = (double)temp_t;
+            }
+            else if(fields[PointFieldTypes::TIME].second == sensor_msgs::msg::PointField::UINT32)
+            {
+                uint32_t temp_t;
+                memcpy(&(temp_t), &(msg->data[(msg->point_step*i) + fields[PointFieldTypes::TIME].first]), sizeof(uint32_t));
+                output[i].t = ((double)temp_t) * time_scale;
+            }
+            else
+            {
+                std::cout << "The time field is not of type float32 or float64 or unit32" << std::endl;
+                output[i].t = rclcpp::Time(msg->header.stamp).seconds();
+            }
+        }
+        if(has_intensity)
+        {
+            memcpy(&(output[i].i),&(msg->data[(msg->point_step*i) + fields[PointFieldTypes::INTENSITY].first]), sizeof(float));
+        }
+        if(has_type)
+        {
+            memcpy(&(output[i].type),&(msg->data[(msg->point_step*i) + fields[PointFieldTypes::TYPE].first]), sizeof(int));
+        }
+        if(has_channel)
+        {
+            if(fields[PointFieldTypes::CHANNEL].second == sensor_msgs::msg::PointField::UINT16)
+            {
+                uint16_t temp_channel;
+                memcpy(&(temp_channel),&(msg->data[(msg->point_step*i) + fields[PointFieldTypes::CHANNEL].first]), sizeof(uint16_t));
+                output[i].channel = (int)temp_channel;
+            }
+            else if(fields[PointFieldTypes::CHANNEL].second == sensor_msgs::msg::PointField::INT32)
+            {
+                int32_t temp_channel;
+                memcpy(&(temp_channel),&(msg->data[(msg->point_step*i) + fields[PointFieldTypes::CHANNEL].first]), sizeof(int32_t));
+                output[i].channel = (int)temp_channel;
+            }
+            else if(fields[PointFieldTypes::CHANNEL].second == sensor_msgs::msg::PointField::UINT32)
+            {
+                uint32_t temp_channel;
+                memcpy(&(temp_channel),&(msg->data[(msg->point_step*i) + fields[PointFieldTypes::CHANNEL].first]), sizeof(uint32_t));
+                output[i].channel = (int)temp_channel;
+            }
+            else if(fields[PointFieldTypes::CHANNEL].second == sensor_msgs::msg::PointField::INT16)
+            {
+                int16_t temp_channel;
+                memcpy(&(temp_channel),&(msg->data[(msg->point_step*i) + fields[PointFieldTypes::CHANNEL].first]), sizeof(int16_t));
+                output[i].channel = (int)temp_channel;
+            }
+            else if(fields[PointFieldTypes::CHANNEL].second == sensor_msgs::msg::PointField::INT8)
+            {
+                int8_t temp_channel;
+                memcpy(&(temp_channel),&(msg->data[(msg->point_step*i) + fields[PointFieldTypes::CHANNEL].first]), sizeof(int8_t));
+                output[i].channel = (int)temp_channel;
+            }
+            else if(fields[PointFieldTypes::CHANNEL].second == sensor_msgs::msg::PointField::UINT8)
+            {
+                uint8_t temp_channel;
+                memcpy(&(temp_channel),&(msg->data[(msg->point_step*i) + fields[PointFieldTypes::CHANNEL].first]), sizeof(uint8_t));
+                output[i].channel = (int)temp_channel;
+            }
+            else
+            {
+                std::cout << "The channel field is of unknown type" << std::endl;
+            }
+        }
+        if(has_scan_id)
+        {
+            memcpy(&(output[i].scan_id),&(msg->data[(msg->point_step*i) + fields[PointFieldTypes::SCAN_ID].first]), sizeof(int));
+        }
+        if(has_dynamic)
+        {
+            output[i].dynamic = msg->data[(msg->point_step*i) + fields[PointFieldTypes::DYNAMIC].first];
+        }
+    }
+    return {output, has_intensity, has_channel};
+}
+
+
+inline Mat4 transformToMat4(const geometry_msgs::msg::Transform& msg)
+{
+    Mat4 output = Mat4::Identity();
+    output(0,3) = msg.translation.x;
+    output(1,3) = msg.translation.y;
+    output(2,3) = msg.translation.z;
+    Eigen::Quaterniond q(msg.rotation.w, msg.rotation.x, msg.rotation.y, msg.rotation.z);
+    output.block<3,3>(0,0) = q.toRotationMatrix();
+    return output;
+}
+
+inline geometry_msgs::msg::Transform mat4ToTransform(const Mat4& mat)
+{
+    geometry_msgs::msg::Transform output;
+    output.translation.x = mat(0,3);
+    output.translation.y = mat(1,3);
+    output.translation.z = mat(2,3);
+    Eigen::Quaterniond q(mat.block<3,3>(0,0));
+    output.rotation.x = q.x();
+    output.rotation.y = q.y();
+    output.rotation.z = q.z();
+    output.rotation.w = q.w();
+    return output;
+}

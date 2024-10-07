@@ -1,0 +1,5 @@
+uint32 num_pts
+uint32 dim
+float64[] pts
+---
+float64[] dists

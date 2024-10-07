@@ -1,0 +1,16 @@
+.*
+!.bazelrc
+!.clang-format
+!.gitignore
+!.github
+!*.yml
+bazel-*
+!bazel-*.sh
+compile_commands.json
+perf.data*
+build
+out
+cygwin
+CMakeSettings.json
+
+**/cmake-build-debug/
