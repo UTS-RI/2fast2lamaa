@@ -1,28 +1,29 @@
-#include <rclcpp/rclcpp.hpp>
+#include <ros/ros.h>
 #include "lice/ros_utils.h"
 #include "lice/types.h"
 #include "lice/utils.h"
 #include "lice/math_utils.h"
-#include "sensor_msgs/msg/point_cloud2.hpp"
+#include "sensor_msgs/PointCloud2.h"
 
 #include "lice/lidar_front_end.h"
 
 #include "ankerl/unordered_dense.h"
 
-class LidarFeatureNode : public rclcpp::Node
+class LidarFeatureNode
 {
     public:
         LidarFeatureNode()
-            : Node("lidar_feature_node")
         {
-            RCLCPP_INFO(this->get_logger(), "Starting lidar_feature_node node");
-            max_dist_ = float(readRequiredFieldDouble(this, "max_dist"));
-            min_dist_ = float(readRequiredFieldDouble(this, "min_dist"));
-            max_planar_pts_ = readFieldInt(this, "max_planar_pts", 1000);
-            std::string channel_elevation_str = readFieldString(this, "channel_elevation", "");
+            ros::NodeHandle nh("~");
 
-            pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/lidar_features", 10);
-            sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>("/lidar_scan", 10, std::bind(&LidarFeatureNode::pcCallback, this, std::placeholders::_1));
+            ROS_INFO("Starting lidar_feature_node node");
+            max_dist_ = float(readRequiredField<double>(nh, "max_dist"));
+            min_dist_ = float(readRequiredField<double>(nh, "min_dist"));
+            max_planar_pts_ = readField<int>(nh, "max_planar_pts", 1000);
+            std::string channel_elevation_str = readField<std::string>(nh, "channel_elevation", "");
+
+            pub_ = nh.advertise<sensor_msgs::PointCloud2>("/lidar_features", 10);
+            sub_ = nh.subscribe("/lidar_scan", 10, &LidarFeatureNode::pcCallback, this);
 
             if(channel_elevation_str != "")
             {
@@ -48,12 +49,12 @@ class LidarFeatureNode : public rclcpp::Node
 
 
 
-        rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr sub_;
-        rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_;
+        ros::Subscriber sub_;
+        ros::Publisher pub_;
 
 
 
-        void pcCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
+        void pcCallback(const sensor_msgs::PointCloud2ConstPtr msg)
         {
             std::vector<Pointf> pts = pointCloud2MsgToPtsVecInternalFloat(msg);
 
@@ -205,7 +206,7 @@ class LidarFeatureNode : public rclcpp::Node
             all_features.insert(all_features.end(), planar_pts.begin(), planar_pts.end());
             all_features.insert(all_features.end(), edge_pts.begin(), edge_pts.end());
 
-            pub_->publish(ptsVecToPointCloud2MsgInternal(all_features, msg->header));
+            pub_.publish(ptsVecToPointCloud2MsgInternal(all_features, msg->header));
         }
 
 };
@@ -213,10 +214,9 @@ class LidarFeatureNode : public rclcpp::Node
 
 int main(int argc, char **argv)
 {
-    rclcpp::init(argc, argv);
-    auto node = std::make_shared<LidarFeatureNode>();
-    rclcpp::spin(node);
-    rclcpp::shutdown();
+    ros::init(argc, argv, "lidar_feature");
+    LidarFeatureNode node;
+    ros::spin();
     return 0;
 }
 

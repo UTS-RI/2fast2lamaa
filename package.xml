@@ -1,26 +1,31 @@
 <?xml version="1.0"?>
-<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
-<package format="3">
+<package format="2">
   <name>ffastllamaa</name>
   <version>0.0.0</version>
   <description>The 2Fast-2Lamaa package</description>
   <maintainer email="le.gentil.cedric@gmail.com">Cedric Le Gentil</maintainer>
   <license>MIT</license>
 
+  <buildtool_depend>catkin</buildtool_depend>
 
-  <buildtool_depend>ament_cmake</buildtool_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>tf2</build_depend>
+  <build_depend>tf2_ros</build_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>message_filters</build_depend>
+  <build_depend>message_generation</build_depend>
 
-  <depend>std_msgs</depend>
-  <depend>sensor_msgs</depend>
-  <depend>tf2</depend>
-  <depend>tf2_ros</depend>
-  <depend>roscpp</depend>
-
-  <buildtool_depend>rosidl_default_generators</buildtool_depend>
-  <exec_depend>rosidl_default_runtime</exec_depend>
-  <member_of_group>rosidl_interface_packages</member_of_group>
-
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>tf2</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>roscpp</exec_depend>
+  <exec_depend>message_filters</exec_depend>
+  <exec_depend>message_runtime</exec_depend>
   <export>
-    <build_type>ament_cmake</build_type>
+    <!-- ROS1 does not require the build_type tag in the export section for most packages -->
   </export>
 </package>

@@ -3,67 +3,65 @@
 
 
 LidarOdometryNode::LidarOdometryNode()
-    : rclcpp::Node("lidar_odometry")
 {
-    RCLCPP_INFO(this->get_logger(), "Starting lidar_odometry node");
+    ros::NodeHandle nh("~");
+
+    ROS_INFO("Starting lidar_odometry node");
 
     LidarOdometryParams params;
-    params.min_feature_dist = readFieldDouble(this, "min_feature_dist", 0.05);
-    params.max_feature_dist = readFieldDouble(this, "max_feature_dist", 0.5);
-    params.nb_scans_per_submap = readFieldInt(this, "nb_scans_per_submap", 2);
-    params.state_frequency = readFieldDouble(this, "state_freq", 100.0);
-    acc_in_m_s2_ = readFieldBool(this, "acc_in_m_per_s2", true);
-    invert_imu_ = readFieldBool(this, "invert_imu", true);
+    params.min_feature_dist = readField<double>(nh, "min_feature_dist", 0.05);
+    params.max_feature_dist = readField<double>(nh, "max_feature_dist", 0.5);
+    params.nb_scans_per_submap = readField<int>(nh, "nb_scans_per_submap", 2);
+    params.state_frequency = readField<double>(nh, "state_freq", 100.0);
+    acc_in_m_s2_ = readField<bool>(nh, "acc_in_m_per_s2", true);
+    invert_imu_ = readField<bool>(nh, "invert_imu", true);
 
-    params.calib_px = readRequiredFieldDouble(this, "calib_px");
-    params.calib_py = readRequiredFieldDouble(this, "calib_py");
-    params.calib_pz = readRequiredFieldDouble(this, "calib_pz");
-    params.calib_rx = readRequiredFieldDouble(this, "calib_rx");
-    params.calib_ry = readRequiredFieldDouble(this, "calib_ry");
-    params.calib_rz = readRequiredFieldDouble(this, "calib_rz");
+    params.calib_px = readRequiredField<double>(nh, "calib_px");
+    params.calib_py = readRequiredField<double>(nh, "calib_py");
+    params.calib_pz = readRequiredField<double>(nh, "calib_pz");
+    params.calib_rx = readRequiredField<double>(nh, "calib_rx");
+    params.calib_ry = readRequiredField<double>(nh, "calib_ry");
+    params.calib_rz = readRequiredField<double>(nh, "calib_rz");
 
-    params.publish_all_scans = readFieldBool(this, "publish_all_scans", false);
-    params.dynamic_filtering = readFieldBool(this, "dynamic_filtering", false);
-    params.dynamic_filtering_threshold = float(readFieldDouble(this, "dynamic_filtering_threshold", 0.5));
-    params.dynamic_filtering_voxel_size = float(readFieldDouble(this, "dynamic_filtering_voxel_size", 0.15));
-    params.key_framing = readFieldBool(this, "key_framing", false);
-    params.key_frame_dist = readFieldDouble(this, "key_frame_dist_thr", 1.0);
-    params.key_frame_angle = readFieldDouble(this, "key_frame_rot_thr", 0.25);
-    params.key_frame_time = readFieldDouble(this, "key_frame_time_thr", 0.1);
+    params.publish_all_scans = readField<bool>(nh, "publish_all_scans", false);
+    params.dynamic_filtering = readField<bool>(nh, "dynamic_filtering", false);
+    params.dynamic_filtering_threshold = float(readField<double>(nh, "dynamic_filtering_threshold", 0.5));
+    params.dynamic_filtering_voxel_size = float(readField<double>(nh, "dynamic_filtering_voxel_size", 0.15));
+    params.key_framing = readField<bool>(nh, "key_framing", false);
+    params.key_frame_dist = readField<double>(nh, "key_frame_dist_thr", 1.0);
+    params.key_frame_angle = readField<double>(nh, "key_frame_rot_thr", 0.25);
+    params.key_frame_time = readField<double>(nh, "key_frame_time_thr", 0.1);
 
 
 
     lidar_odometry_ = std::make_shared<LidarOdometry>(params, this);
 
-
-    odom_pub_ = this->create_publisher<geometry_msgs::msg::TransformStamped>("/undistortion_delta_transform", 10);
-    global_odom_pub_ = this->create_publisher<geometry_msgs::msg::TransformStamped>("/undistortion_pose", 10);
-    pc_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/lidar_scan_undistorted", 10);
+    odom_pub_ = nh.advertise<geometry_msgs::TransformStamped>("/undistortion_delta_transform", 10);
+    global_odom_pub_ = nh.advertise<geometry_msgs::TransformStamped>("/undistortion_pose", 10);
+    pc_pub_ = nh.advertise<sensor_msgs::PointCloud2>("/lidar_scan_undistorted", 10);
 
     if(params.dynamic_filtering)
     {
-        pc_static_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/lidar_static", 10);
-        pc_dynamic_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/lidar_dynamic", 10);
-        pc_unsure_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/lidar_unsure", 10);
+        pc_static_pub_ = nh.advertise<sensor_msgs::PointCloud2>("/lidar_static", 10);
+        pc_dynamic_pub_ = nh.advertise<sensor_msgs::PointCloud2>("/lidar_dynamic", 10);
+        pc_unsure_pub_ = nh.advertise<sensor_msgs::PointCloud2>("/lidar_unsure", 10);
     }
 
-    acc_sub_ = this->create_subscription<sensor_msgs::msg::Imu>("/imu/acc", 100, std::bind(&LidarOdometryNode::accCallback, this, std::placeholders::_1));
-    gyr_sub_ = this->create_subscription<sensor_msgs::msg::Imu>("/imu/gyr", 100, std::bind(&LidarOdometryNode::gyrCallback, this, std::placeholders::_1));
+    acc_sub_ = nh.subscribe("/imu/acc", 100, &LidarOdometryNode::accCallback, this);
+    gyr_sub_ = nh.subscribe("/imu/gyr", 100, &LidarOdometryNode::gyrCallback, this);
 
-    odom_map_correction_sub_ = this->create_subscription<geometry_msgs::msg::TransformStamped>("/odom_map_correction", 10, std::bind(&LidarOdometryNode::odomMapCorrectionCallback, this, std::placeholders::_1));
+    odom_map_correction_sub_ = nh.subscribe("/odom_map_correction", 10, &LidarOdometryNode::odomMapCorrectionCallback, this);
 
-    feature_sub_.subscribe(this, "/lidar_features");
-    pc_sub_.subscribe(this, "/lidar_scan");
-    sync_ = std::make_shared<message_filters::TimeSynchronizer<sensor_msgs::msg::PointCloud2, sensor_msgs::msg::PointCloud2>>(feature_sub_, pc_sub_, 20);
+    message_filters::Subscriber<sensor_msgs::PointCloud2> feature_sub(nh, "/lidar_features", 10);
+    message_filters::Subscriber<sensor_msgs::PointCloud2> pc_sub(nh, "/lidar_scan", 10);
+    sync_ = std::make_shared<message_filters::TimeSynchronizer<sensor_msgs::PointCloud2, sensor_msgs::PointCloud2>>(feature_sub, pc_sub, 20);
     sync_->registerCallback(std::bind(&LidarOdometryNode::pcCallback, this, std::placeholders::_1, std::placeholders::_2));
 
-    rclcpp::node_interfaces::NodeTopicsInterface::SharedPtr node_topics_handle = this->get_node_topics_interface();
-    br_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this, tf2_ros::DynamicBroadcasterQoS(), rclcpp::PublisherOptions());
+    br_ = std::make_unique<tf2_ros::TransformBroadcaster>();
 
     auto thread = lidar_odometry_->runThread();
 
-
-    rclcpp::spin(this->get_node_base_interface());
+    ros::spin();
 
     lidar_odometry_->stop();
     thread->join();
@@ -73,10 +71,10 @@ LidarOdometryNode::LidarOdometryNode()
 
 void LidarOdometryNode::publishTransform(const double t, const Vec3& pos, const Vec3& rot)
 {
-    rclcpp::Time new_time = first_t_ + rclcpp::Duration::from_seconds(t);
+    ros::Time new_time = first_t_ + ros::Duration(t);
 
     // Send a TF transform
-    geometry_msgs::msg::TransformStamped transformStamped;
+    geometry_msgs::TransformStamped transformStamped;
     transformStamped.header.stamp = new_time;
     transformStamped.header.frame_id = "odom";
     transformStamped.child_frame_id = "lidar";
@@ -100,15 +98,15 @@ void LidarOdometryNode::publishTransform(const double t, const Vec3& pos, const 
         br_->sendTransform(temp_msg);
     }
     br_->sendTransform(transformStamped);
-    global_odom_pub_->publish(transformStamped);
+    global_odom_pub_.publish(transformStamped);
     mutex_br_.unlock();
 }
 void LidarOdometryNode::publishDeltaTransform(const double t, const Vec3& dp, const Vec3& dr)
 {
-    rclcpp::Time new_time = first_t_ + rclcpp::Duration::from_seconds(t);
+    ros::Time new_time = first_t_ + ros::Duration(t);
 
     // Send the delta transform
-    geometry_msgs::msg::TransformStamped delta_trans;
+    geometry_msgs::TransformStamped delta_trans;
     delta_trans.header.stamp = new_time;
     delta_trans.header.frame_id = "lidar";
     delta_trans.child_frame_id = "lidar_head";
@@ -126,34 +124,34 @@ void LidarOdometryNode::publishDeltaTransform(const double t, const Vec3& dp, co
     // Publish the delta transform
     mutex_br_.lock();
     br_->sendTransform(delta_trans);
-    odom_pub_->publish(delta_trans);
+    odom_pub_.publish(delta_trans);
     mutex_br_.unlock();
 }
 
 void LidarOdometryNode::publishPc(const double t, const std::vector<Pointf>& pc)
 {
-    rclcpp::Time new_time = first_t_ + rclcpp::Duration::from_seconds(t);
-    sensor_msgs::msg::PointCloud2 pc_msg = ptsVecToPointCloud2MsgInternal(pc, "lidar", new_time);
+    ros::Time new_time = first_t_ + ros::Duration(t);
+    sensor_msgs::PointCloud2 pc_msg = ptsVecToPointCloud2MsgInternal(pc, "lidar", new_time);
     mutex_pc_.lock();
-    pc_pub_->publish(pc_msg);
+    pc_pub_.publish(pc_msg);
     mutex_pc_.unlock();
 }
 void LidarOdometryNode::publishPcFiltered(const double t, const std::vector<Pointf>& pc_static, const std::vector<Pointf>& pc_dynamic, const std::vector<Pointf>& pc_unsure)
 {
-    rclcpp::Time new_time = first_t_ + rclcpp::Duration::from_seconds(t);
+    ros::Time new_time = first_t_ + ros::Duration(t);
 
-    sensor_msgs::msg::PointCloud2 static_msg = ptsVecToPointCloud2MsgInternal(pc_static, "lidar", new_time);
-    sensor_msgs::msg::PointCloud2 dynamic_msg = ptsVecToPointCloud2MsgInternal(pc_dynamic, "lidar", new_time);
-    sensor_msgs::msg::PointCloud2 unsure_msg = ptsVecToPointCloud2MsgInternal(pc_unsure, "lidar", new_time);
+    sensor_msgs::PointCloud2 static_msg = ptsVecToPointCloud2MsgInternal(pc_static, "lidar", new_time);
+    sensor_msgs::PointCloud2 dynamic_msg = ptsVecToPointCloud2MsgInternal(pc_dynamic, "lidar", new_time);
+    sensor_msgs::PointCloud2 unsure_msg = ptsVecToPointCloud2MsgInternal(pc_unsure, "lidar", new_time);
     mutex_pc_filtered_.lock();
-    pc_static_pub_->publish(static_msg);
-    pc_dynamic_pub_->publish(dynamic_msg);
-    pc_unsure_pub_->publish(unsure_msg);
+    pc_static_pub_.publish(static_msg);
+    pc_dynamic_pub_.publish(dynamic_msg);
+    pc_unsure_pub_.publish(unsure_msg);
     mutex_pc_filtered_.unlock();
 }
 
 
-void LidarOdometryNode::odomMapCorrectionCallback(const geometry_msgs::msg::TransformStamped::SharedPtr msg)
+void LidarOdometryNode::odomMapCorrectionCallback(const geometry_msgs::TransformStampedConstPtr& msg)
 {
     mutex_br_.lock();
     // Save the correction
@@ -162,9 +160,9 @@ void LidarOdometryNode::odomMapCorrectionCallback(const geometry_msgs::msg::Tran
 }
 
 
-void LidarOdometryNode::pcCallback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr feature_msg, const sensor_msgs::msg::PointCloud2::ConstSharedPtr pc_msg)
+void LidarOdometryNode::pcCallback(const sensor_msgs::PointCloud2ConstPtr& feature_msg, const sensor_msgs::PointCloud2ConstPtr& pc_msg)
 {
-    rclcpp::Time header_time = feature_msg->header.stamp;
+    ros::Time header_time = feature_msg->header.stamp;
     if(first_)
     {
         first_ = false;
@@ -192,7 +190,7 @@ void LidarOdometryNode::pcCallback(const sensor_msgs::msg::PointCloud2::ConstSha
     }
     scan_count_++;
 
-    double time_offset = (header_time-first_t_).seconds();
+    double time_offset = (header_time-first_t_).toSec();
 
     // Create shared pointers to the point clouds
     std::shared_ptr<std::vector<Pointd> > features_ptr = std::make_shared<std::vector<Pointd> >(std::move(features));
@@ -211,9 +209,9 @@ void LidarOdometryNode::pcCallback(const sensor_msgs::msg::PointCloud2::ConstSha
 
 }
 
-void LidarOdometryNode::accCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
+void LidarOdometryNode::accCallback(const sensor_msgs::ImuConstPtr& msg)
 {
-    rclcpp::Time header_time = msg->header.stamp;
+    ros::Time header_time = msg->header.stamp;
     if(first_)
     {
         first_ = false;
@@ -235,12 +233,12 @@ void LidarOdometryNode::accCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
     {
         acc *= -1;
     }
-    lidar_odometry_->addAccSample(acc, (header_time-first_t_).seconds());
+    lidar_odometry_->addAccSample(acc, (header_time-first_t_).toSec());
 }
 
-void LidarOdometryNode::gyrCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
+void LidarOdometryNode::gyrCallback(const sensor_msgs::ImuConstPtr& msg)
 {
-    rclcpp::Time header_time = msg->header.stamp;
+    ros::Time header_time = msg->header.stamp;
     if(first_)
     {
         first_ = false;
@@ -258,15 +256,14 @@ void LidarOdometryNode::gyrCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
     {
         gyr *= -1;
     }
-    lidar_odometry_->addGyroSample(gyr, (header_time-first_t_).seconds());
+    lidar_odometry_->addGyroSample(gyr, (header_time-first_t_).toSec());
 }
 
 
 int main(int argc, char **argv)
 {
-    rclcpp::init(argc, argv);
-    auto node = std::make_shared<LidarOdometryNode>();
-    rclcpp::shutdown();
+    ros::init(argc, argv, "lidar_odometry");
+    LidarOdometryNode node;
     return 0;
 }
 

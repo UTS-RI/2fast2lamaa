@@ -1,16 +1,16 @@
 #pragma once
 
-#include "rclcpp/rclcpp.hpp"
+#include "ros/ros.h"
 #include "lice/ros_utils.h"
 #include "lice/utils.h"
 #include "lice/types.h"
 #include "lice/lidar_odometry.h"
 #include <memory>
 
-#include "sensor_msgs/msg/point_cloud2.hpp"
-#include "geometry_msgs/msg/transform_stamped.hpp"
+#include "sensor_msgs/PointCloud2.h"
+#include "geometry_msgs/TransformStamped.h"
 #include "tf2_ros/transform_broadcaster.h"
-#include "sensor_msgs/msg/imu.hpp"
+#include "sensor_msgs/Imu.h"
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
 
@@ -18,7 +18,7 @@
 class LidarOdometry;
 
 
-class LidarOdometryNode : public rclcpp::Node
+class LidarOdometryNode
 {
     public:
         LidarOdometryNode();
@@ -31,23 +31,20 @@ class LidarOdometryNode : public rclcpp::Node
     private:
         std::shared_ptr<LidarOdometry> lidar_odometry_;
 
-        rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr acc_sub_;
-        rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr gyr_sub_;
-        rclcpp::Subscription<geometry_msgs::msg::TransformStamped>::SharedPtr odom_map_correction_sub_;
+        ros::Subscriber acc_sub_;
+        ros::Subscriber gyr_sub_;
+        ros::Subscriber odom_map_correction_sub_;
 
-        message_filters::Subscriber<sensor_msgs::msg::PointCloud2> feature_sub_;
-        message_filters::Subscriber<sensor_msgs::msg::PointCloud2> pc_sub_;
-
-        rclcpp::Publisher<geometry_msgs::msg::TransformStamped>::SharedPtr odom_pub_;
-        rclcpp::Publisher<geometry_msgs::msg::TransformStamped>::SharedPtr global_odom_pub_;
-        rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pc_pub_;
+        ros::Publisher odom_pub_;
+        ros::Publisher global_odom_pub_;
+        ros::Publisher pc_pub_;
 
 
-        rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pc_static_pub_;
-        rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pc_dynamic_pub_;
-        rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pc_unsure_pub_;
+        ros::Publisher pc_static_pub_;
+        ros::Publisher pc_dynamic_pub_;
+        ros::Publisher pc_unsure_pub_;
 
-        std::shared_ptr<message_filters::TimeSynchronizer<sensor_msgs::msg::PointCloud2, sensor_msgs::msg::PointCloud2>> sync_;
+        std::shared_ptr<message_filters::TimeSynchronizer<sensor_msgs::PointCloud2, sensor_msgs::PointCloud2>> sync_;
 
         std::unique_ptr<tf2_ros::TransformBroadcaster> br_;
 
@@ -55,9 +52,9 @@ class LidarOdometryNode : public rclcpp::Node
         std::mutex mutex_pc_;
         std::mutex mutex_pc_filtered_;
 
-        rclcpp::Time first_t_;
-        rclcpp::Time first_acc_t_;
-        rclcpp::Time first_gyr_t_;
+        ros::Time first_t_;
+        ros::Time first_acc_t_;
+        ros::Time first_gyr_t_;
         bool first_ = true;
         bool first_acc_ = true;
         bool first_gyr_ = true;
@@ -66,14 +63,14 @@ class LidarOdometryNode : public rclcpp::Node
 
         bool acc_in_m_s2_ = true;
 
-        geometry_msgs::msg::TransformStamped::SharedPtr odom_map_correction_msg_;
+        geometry_msgs::TransformStampedConstPtr odom_map_correction_msg_;
 
 
-        void pcCallback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr feature_msg, const sensor_msgs::msg::PointCloud2::ConstSharedPtr pc_msg);
+        void pcCallback(const sensor_msgs::PointCloud2ConstPtr& feature_msg, const sensor_msgs::PointCloud2ConstPtr& pc_msg);
 
-        void accCallback(const sensor_msgs::msg::Imu::SharedPtr msg);
+        void accCallback(const sensor_msgs::ImuConstPtr& msg);
 
-        void gyrCallback(const sensor_msgs::msg::Imu::SharedPtr msg);
+        void gyrCallback(const sensor_msgs::ImuConstPtr& msg);
 
-        void odomMapCorrectionCallback(const geometry_msgs::msg::TransformStamped::SharedPtr msg);
+        void odomMapCorrectionCallback(const geometry_msgs::TransformStampedConstPtr& msg);
 };

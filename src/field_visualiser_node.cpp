@@ -1,28 +1,29 @@
-#include "rclcpp/rclcpp.hpp"
+#include "ros/ros.h"
 #include <Eigen/Dense>
 #include "lice/ros_utils.h"
 
-#include <sensor_msgs/msg/point_cloud2.hpp>
-#include <geometry_msgs/msg/transform_stamped.hpp>
+#include <sensor_msgs/PointCloud2.h>
+#include <geometry_msgs/TransformStamped.h>
 
-#include "ffastllamaa/srv/query_dist_field.hpp"
+#include "ffastllamaa/QueryDistField.h"
 
 
-class FieldVisualiser : public rclcpp::Node
+class FieldVisualiser
 {
     public:
-        FieldVisualiser() : Node("field_visualiser")
+        FieldVisualiser()
         {
-            double range = readFieldDouble(this, "range", 10.0);
-            double resolution = readFieldDouble(this, "resolution", 0.05);
+            ros::NodeHandle nh("~");
 
-            pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("field", 10);
+            double range = readField<double>(nh, "range", 10.0);
+            double resolution = readField<double>(nh, "resolution", 0.05);
 
-            odom_pose_sub_ = this->create_subscription<geometry_msgs::msg::TransformStamped>("/undistortion_pose", 10, std::bind(&FieldVisualiser::callbackOdom, this, std::placeholders::_1));
-            map_odom_correction_sub_ = this->create_subscription<geometry_msgs::msg::TransformStamped>("/odom_map_correction", 10, std::bind(&FieldVisualiser::callbackCorrection, this, std::placeholders::_1));
+            pub_ = nh.advertise<sensor_msgs::PointCloud2>("field", 10);
 
-            client_ = this->create_client<ffastllamaa::srv::QueryDistField>("/query_dist_field");
+            odom_pose_sub_ = nh.subscribe("/undistortion_pose", 10, &FieldVisualiser::callbackOdom, this);
+            map_odom_correction_sub_ = nh.subscribe("/odom_map_correction", 10, &FieldVisualiser::callbackCorrection, this);
 
+            client_ = nh.serviceClient<ffastllamaa::QueryDistField>("/query_dist_field");
 
             for(double x = -range; x < range; x += resolution)
             {
@@ -61,65 +62,48 @@ class FieldVisualiser : public rclcpp::Node
             }
 
 
-            rclcpp::Rate rate(20);
+            ros::Rate rate(20);
 
-            while(rclcpp::ok())
+            while(ros::ok())
             {
-                rclcpp::spin_some(this->get_node_base_interface());
+                ros::spinOnce();
 
-                if(new_pose_ && pub_->get_subscription_count() > 0)
+                if(new_pose_ && pub_.getNumSubscribers() > 0)
                 {
                     Mat4 map_pose = map_odom_correction_*odom_pose_;
                     Vec3 pos = map_pose.block<3,1>(0,3);
 
 
-                    auto request = std::make_shared<ffastllamaa::srv::QueryDistField::Request>();
-                    request->dim = 3;
-                    request->num_pts = pts_.size();
+                    ffastllamaa::QueryDistField::Request request;
+                    request.dim = 3;
+                    request.num_pts = pts_.size();
                     std::vector<Pointd> pts;
                     for(size_t i = 0; i < pts_.size(); i++)
                     {
                         Vec3 pt = pts_[i] + pos;
-                        request->pts.push_back(pt[0]);
-                        request->pts.push_back(pt[1]);
-                        request->pts.push_back(pt[2]);
+                        request.pts.push_back(pt[0]);
+                        request.pts.push_back(pt[1]);
+                        request.pts.push_back(pt[2]);
                         pts.push_back(Pointd(pt,0.0));
                     }
 
-
-                    while(!client_->wait_for_service(std::chrono::seconds(1)))
+                    ffastllamaa::QueryDistField::Response response;
+                    if(!client_.call(request, response))
                     {
-                        if (!rclcpp::ok())
-                        {
-                            RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for the service. Exiting.");
-                            return;
-                        }
-                        RCLCPP_INFO(this->get_logger(), "service not available, waiting again...");
-                    }
-
-                    auto result = client_->async_send_request(request);
-
-
-                    if(rclcpp::spin_until_future_complete(this->get_node_base_interface() , result) != rclcpp::FutureReturnCode::SUCCESS)
-                    {
-                        RCLCPP_ERROR(this->get_logger(), "Failed to call service");
+                        ROS_ERROR("Failed to call service");
                         return;
                     }
 
-
-
-                    auto response = result.get();
-
                     for(size_t i = 0; i < pts.size(); i++)
                     {
-                        pts[i].i = response->dists[i];
+                        pts[i].i = response.dists[i];
                     }
 
-                    sensor_msgs::msg::PointCloud2 msg = ptsVecToPointCloud2MsgInternal(pts, "map", odom_time_);
-                    pub_->publish(msg);
+                    sensor_msgs::PointCloud2 msg = ptsVecToPointCloud2MsgInternal(pts, "map", odom_time_);
+                    pub_.publish(msg);
 
                     new_pose_ = false;
-                    RCLCPP_INFO(this->get_logger(), "Published field point cloud");
+                    ROS_INFO("Published field point cloud");
                 }
                 rate.sleep();
             }
@@ -128,22 +112,21 @@ class FieldVisualiser : public rclcpp::Node
     private:
         std::vector<Vec3> pts_;
 
-        rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_;
+        ros::Publisher pub_;
 
-        rclcpp::Subscription<geometry_msgs::msg::TransformStamped>::SharedPtr odom_pose_sub_;
+        ros::Subscriber odom_pose_sub_;
 
-        rclcpp::Subscription<geometry_msgs::msg::TransformStamped>::SharedPtr map_odom_correction_sub_;
+        ros::Subscriber map_odom_correction_sub_;
 
-
-        std::shared_ptr<rclcpp::Client<ffastllamaa::srv::QueryDistField> > client_;
+        ros::ServiceClient client_;
 
         bool new_pose_ = false;
-        rclcpp::Time odom_time_;
+        ros::Time odom_time_;
         Mat4 odom_pose_ = Mat4::Identity();
         Mat4 map_odom_correction_ = Mat4::Identity();
 
 
-        void callbackOdom(const geometry_msgs::msg::TransformStamped::SharedPtr odom_pose)
+        void callbackOdom(const geometry_msgs::TransformStampedConstPtr& odom_pose)
         {
             odom_time_ = odom_pose->header.stamp;
             odom_pose_ = transformToMat4(odom_pose->transform);
@@ -151,7 +134,7 @@ class FieldVisualiser : public rclcpp::Node
             return;
         }
 
-        void callbackCorrection(const geometry_msgs::msg::TransformStamped::SharedPtr map_odom_correction)
+        void callbackCorrection(const geometry_msgs::TransformStampedConstPtr& map_odom_correction)
         {
             map_odom_correction_ = transformToMat4(map_odom_correction->transform);
             new_pose_ = true;
@@ -169,8 +152,7 @@ class FieldVisualiser : public rclcpp::Node
 
 int main(int argc, char **argv)
 {
-    rclcpp::init(argc, argv);
-    auto node = std::make_shared<FieldVisualiser>();
-    rclcpp::shutdown();
+    ros::init(argc, argv, "field_visualiser");
+    FieldVisualiser field_visualiser;
     return 0;
 }

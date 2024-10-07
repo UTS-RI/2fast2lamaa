@@ -268,7 +268,7 @@ std::vector<std::vector<T>> unflattenList(const std::vector<T>& flatList, const 
 }
 
 
-}; // namespace
+} // namespace
 
 
 /**
@@ -1268,7 +1268,7 @@ inline std::vector<std::string> tokenSplit(const std::string& input) {
 inline bool startsWith(const std::string& input, const std::string& query) {
   return input.compare(0, query.length(), query) == 0;
 }
-}; // namespace
+} // namespace
 
 
 /**
@@ -1549,7 +1549,7 @@ public:
    * @param vertexPositions A vector of vertex positions
    */
   template <typename T>
-  void addVertexPositions(std::vector<Eigen::Vector<T, 3> >& vertexPositions) {
+  void addVertexPositions(std::vector<Eigen::Matrix<T,3,1> >& vertexPositions) {
 
     std::string vertexName = "vertex";
     size_t N = vertexPositions.size();
@@ -1633,7 +1633,7 @@ public:
   }
 
   template <typename T>
-  void addVertexNormals(std::vector<Eigen::Vector<T, 3>>& normals) {
+  void addVertexNormals(std::vector<Eigen::Matrix<T,3,1>>& normals) {
 
     std::string vertexName = "vertex";
     size_t N = normals.size();
@@ -1737,7 +1737,7 @@ public:
   }
 
   template <typename T>
-  void addFaceIndices(std::vector<Eigen::Vector<T,3>>& indices) {
+  void addFaceIndices(std::vector<Eigen::Matrix<T,3,1>>& indices) {
 
     std::string faceName = "face";
     size_t N = indices.size();

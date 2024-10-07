@@ -1,0 +1,41 @@
+<launch>
+  <!-- Node for scan_maker -->
+  <node pkg="ffastllamaa" type="scan_maker" name="scan_maker" output="screen">
+    <remap from="/lidar_raw_points" to="/os_cloud_node/points"/>
+    <param name="scan_period" value="0.16"/>
+    <param name="min_range" value="1.0"/>
+    <param name="max_range" value="100.0"/>
+  </node>
+
+  <node pkg="ffastllamaa" type="lidar_feature_detection" name="lidar_feature_detection" output="screen">
+    <param name="min_dist" value="1.0"/>
+    <param name="max_dist" value="100.0"/>
+    <param name="max_planar_pts" value="1000"/>
+  </node>
+
+  <node pkg="ffastllamaa" type="lidar_scan_odometry" name="lidar_scan_odometry" output="screen">
+    <remap from="/imu/acc" to="/os_cloud_node/imu"/>
+    <remap from="/imu/gyr" to="/os_cloud_node/imu"/>
+    <param name="nb_scans_per_submap" value="3"/>
+    <param name="max_feature_dist" value="1.0"/>
+    <param name="state_freq" value="1000.0"/>
+    <param name="publish_all_scans" value="false"/>
+    <param name="acc_in_m_per_s2" value="true"/>
+    <param name="invert_imu" value="false"/>
+    <param name="calib_px" value="0.014"/>
+    <param name="calib_py" value="-0.012"/>
+    <param name="calib_pz" value="-0.015"/>
+    <param name="calib_rx" value="0.0"/>
+    <param name="calib_ry" value="0.0"/>
+    <param name="calib_rz" value="0.0"/>
+    <param name="dynamic_filtering" value="false"/>
+    <param name="dynamic_filtering_threshold" value="0.4"/>
+    <param name="dynamic_filtering_voxel_size" value="0.15"/>
+    <param name="key_framing" value="true"/>
+    <param name="key_frame_dist_thr" value="1.5"/>
+    <param name="key_frame_rot_thr" value="0.349066"/> 
+    <param name="key_frame_time_thr" value="1.0"/>
+  </node>
+
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find ffastllamaa)/cfg/rviz_config.rviz" output="screen" />
+</launch>
