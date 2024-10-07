@@ -39,7 +39,7 @@ The following dependencies are required to build the package:
 - Ceres
 - Eigen
 
-Please refer to the [ROS2 installation guide](https://docs.ros.org/en/foxy/Installation/Ubuntu-Install-Debians.html) for the installation of ROS2.
+Please refer to the [ROS2 installation guide with Ubuntu 24.04](https://docs.ros.org/en/jazzy/Installation/Ubuntu-Install-Debs.html) for the installation of ROS2.
 The other dependencies can be installed using the following command:
 ```bash
 sudo apt install libceres-dev libeigen3-dev
