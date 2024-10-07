@@ -16,10 +16,10 @@ key_frame_time_thr = 1.0
 
 def generate_launch_description():
     rviz_file = PathJoinSubstitution(
-           [FindPackageShare("lice"), "cfg", "rviz_config.rviz"])
+           [FindPackageShare("ffastllamaa"), "cfg", "rviz_config.rviz"])
     return LaunchDescription([
         Node(
-            package='lice', 
+            package='ffastllamaa', 
             executable='scan_maker', 
             name='scan_maker',
             remappings=[
@@ -33,7 +33,7 @@ def generate_launch_description():
             output='screen',
         ),
         Node(
-            package='lice', 
+            package='ffastllamaa', 
             executable='lidar_feature_detection', 
             name='lidar_feature_detection',
             parameters=[
@@ -44,7 +44,7 @@ def generate_launch_description():
             output='screen',
         ),
         Node(
-            package='lice', 
+            package='ffastllamaa', 
             executable='lidar_scan_odometry', 
             name='lidar_scan_odometry',
             remappings=[
