@@ -1,7 +1,7 @@
 # 2Fast-2Lamaa
 
 This repository contains the code of a lidar-inertial localisation and mapping framework named 2Fast-2Lamaa.
-It is built upon the lidar-inertial undistortion work presented at IROS 2024 __link to IROS__.
+It is built upon the lidar-inertial undistortion work presented at IROS 2024 (more details [here](https://uts-ri.github.io/lidar_inertial_motion_correction/).
 If you are looking to use the undistortion-related code from our IROS publication, please refer to the [Undistortion](#undistortion-iros-2024) section.
 
 2Fast-2Lamaa stands for Fast Field-based Agent-Subtracted Tightly-coupled Lidar Localisation And Mapping with Accelerometer and Angular-rate.
