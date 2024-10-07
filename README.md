@@ -39,7 +39,7 @@ The following dependencies are required to build the package:
 - Ceres
 - Eigen
 
-Please refer to the [ROS2 installation guide](https://docs.ros.org/en/foxy/Installation/Ubuntu-Install-Debians.html) for the installation of ROS2.
+Please refer to the [ROS installation guide for Ubuntu 20.04](http://wiki.ros.org/noetic/Installation/Ubuntu) for the installation of ROS.
 The other dependencies can be installed using the following command:
 ```bash
 sudo apt install libceres-dev libeigen3-dev
