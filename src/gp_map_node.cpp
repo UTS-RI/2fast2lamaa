@@ -16,7 +16,7 @@
 
 #include "ankerl/unordered_dense.h"
 
-#include "lice/srv/query_dist_field.hpp"
+#include "ffastllamaa/srv/query_dist_field.hpp"
 
 #include <sys/stat.h>
 
@@ -129,7 +129,7 @@ class GpMapNode: public rclcpp::Node
 
             map_publish_thread_ = std::make_unique<std::thread>(&GpMapNode::mapPublishThread, this);
 
-            query_dist_field_srv_ = this->create_service<lice::srv::QueryDistField>("/query_dist_field", std::bind(&GpMapNode::queryDistFieldCallback, this, std::placeholders::_1, std::placeholders::_2));
+            query_dist_field_srv_ = this->create_service<ffastllamaa::srv::QueryDistField>("/query_dist_field", std::bind(&GpMapNode::queryDistFieldCallback, this, std::placeholders::_1, std::placeholders::_2));
 
             DEBUG_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/DEBUG", 10);
 
@@ -172,7 +172,7 @@ class GpMapNode: public rclcpp::Node
         rclcpp::Publisher<geometry_msgs::msg::TransformStamped>::SharedPtr odom_map_correction_pub_;
 
 
-        rclcpp::Service<lice::srv::QueryDistField>::SharedPtr query_dist_field_srv_;
+        rclcpp::Service<ffastllamaa::srv::QueryDistField>::SharedPtr query_dist_field_srv_;
 
 
         rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr DEBUG_pub_;
@@ -214,7 +214,7 @@ class GpMapNode: public rclcpp::Node
         // Store the last point cloud time
         std::atomic<std::chrono::time_point<std::chrono::high_resolution_clock>> last_pc_epoch_time_;
 
-        void queryDistFieldCallback(const std::shared_ptr<lice::srv::QueryDistField::Request> request, std::shared_ptr<lice::srv::QueryDistField::Response> response)
+        void queryDistFieldCallback(const std::shared_ptr<ffastllamaa::srv::QueryDistField::Request> request, std::shared_ptr<ffastllamaa::srv::QueryDistField::Response> response)
         {
             if(request->dim != 3)
             {

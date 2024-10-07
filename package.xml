@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>2fast-2lamaa</name>
+  <name>ffastllamaa</name>
   <version>0.0.0</version>
-  <description>The 2fast-2lamaa package</description>
+  <description>The 2Fast-2Lamaa package</description>
   <maintainer email="le.gentil.cedric@gmail.com">Cedric Le Gentil</maintainer>
   <license>MIT</license>
 

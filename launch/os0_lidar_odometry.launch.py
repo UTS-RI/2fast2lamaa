@@ -108,7 +108,7 @@ def generate_launch_description():
                 {"free_space_carving_radius": float(20)},
 
                 # Path to where the map will be saved
-                {"map_path": get_package_prefix('lice') + "/share/lice/maps/"},
+                {"map_path": get_package_prefix('ffastllamaa') + "/share/ffastllamaa/maps/"},
                 {"output_normals": True},
                 {"output_mesh": True},
                 {"meshing_point_per_node": 2.0}, # Min number of points per node (float) for the meshing 1.5 and above, the higher the smoother the mesh

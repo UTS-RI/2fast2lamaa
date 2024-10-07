@@ -51,9 +51,10 @@ sudo apt install libceres-dev libeigen3-dev
 To build the package, clone the repository in your workspace and build it using colcon:
 ```bash
 cd /path/to/your/workspace/src
-git clone TODO
+git clone https://github.com/UTS-RI/2fast2lamaa.git
 cd ..
-colcon build --packages-select 2fast-2lamaa
+colcon build --packages-select ffastllamaa
+source install/setup.bash
 ```
 
 ### Running
@@ -67,7 +68,7 @@ Incorrect knowledge of the extrinsic calibration will result in poor localisatio
 
 Then you can run the package using the following command:
 ```bash
-ros2 launch 2fast-2lamaa os0_lidar_odometry.launch.py
+ros2 launch ffastllamaa os0_lidar_odometry.launch.py
 ```
 
 __Please note that the visualisation creates some additional computation and block some mutexes. For optimal performance, deactivate the various visualisations.__
@@ -79,7 +80,7 @@ The undistortion code is available in the `lidar_odometry` node (and requires th
 We provide a launch file to run the undistortion without the registration and mapping components of 2Fast-2Lamaa.
 To run the undistortion code, you can use the following command:
 ```bash
-ros2 launch 2fast-2lamaa os0_lidar_undistortion.launch.py
+ros2 launch ffastllamaa os0_lidar_undistortion.launch.py
 ```
 
 __Please note that the dynamic object detection in the IROS paper is not included in this repository.__

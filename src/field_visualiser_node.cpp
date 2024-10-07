@@ -5,7 +5,7 @@
 #include <sensor_msgs/msg/point_cloud2.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 
-#include "lice/srv/query_dist_field.hpp"
+#include "ffastllamaa/srv/query_dist_field.hpp"
 
 
 class FieldVisualiser : public rclcpp::Node
@@ -21,7 +21,7 @@ class FieldVisualiser : public rclcpp::Node
             odom_pose_sub_ = this->create_subscription<geometry_msgs::msg::TransformStamped>("/undistortion_pose", 10, std::bind(&FieldVisualiser::callbackOdom, this, std::placeholders::_1));
             map_odom_correction_sub_ = this->create_subscription<geometry_msgs::msg::TransformStamped>("/odom_map_correction", 10, std::bind(&FieldVisualiser::callbackCorrection, this, std::placeholders::_1));
 
-            client_ = this->create_client<lice::srv::QueryDistField>("/query_dist_field");
+            client_ = this->create_client<ffastllamaa::srv::QueryDistField>("/query_dist_field");
 
 
             for(double x = -range; x < range; x += resolution)
@@ -73,7 +73,7 @@ class FieldVisualiser : public rclcpp::Node
                     Vec3 pos = map_pose.block<3,1>(0,3);
 
 
-                    auto request = std::make_shared<lice::srv::QueryDistField::Request>();
+                    auto request = std::make_shared<ffastllamaa::srv::QueryDistField::Request>();
                     request->dim = 3;
                     request->num_pts = pts_.size();
                     std::vector<Pointd> pts;
@@ -135,7 +135,7 @@ class FieldVisualiser : public rclcpp::Node
         rclcpp::Subscription<geometry_msgs::msg::TransformStamped>::SharedPtr map_odom_correction_sub_;
 
 
-        std::shared_ptr<rclcpp::Client<lice::srv::QueryDistField> > client_;
+        std::shared_ptr<rclcpp::Client<ffastllamaa::srv::QueryDistField> > client_;
 
         bool new_pose_ = false;
         rclcpp::Time odom_time_;
