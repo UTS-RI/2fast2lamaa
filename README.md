@@ -2,12 +2,12 @@
 
 This repository contains the code of a lidar-inertial localisation and mapping framework named 2Fast-2Lamaa.
 It is built upon the lidar-inertial undistortion work presented at IROS 2024 (more details [here](https://uts-ri.github.io/lidar_inertial_motion_correction/)).
-If you are looking to use the undistortion-related code from our IROS publication, please refer to the [Undistortion](#undistortion-iros-2024) section.
+__If you are looking to use the undistortion-related code from our IROS publication, please refer to the [Undistortion](#undistortion-iros-2024) section.__
 
 2Fast-2Lamaa stands for Fast Field-based Agent-Subtracted Tightly-coupled Lidar Localisation And Mapping with Accelerometer and Angular-rate.
 In other words, it performs localisation and mapping in dynamic environments (_agent-substracted_) with a lidar and an IMU (_accelerometer and angular-rate_) using distance a Gaussian-Process-based distance field.
 The method integrates the [Screen Poisson Surface Reconstruction](https://github.com/mkazhdan/PoissonRecon) to directly output triangle mesh of the environment.
-The technical details of the overall framework can be found in our 2Fast-2Lamaa technical paper __TODO LINK__.
+The technical details of the overall framework can be found in our [2Fast-2Lamaa technical paper](https://arxiv.org/abs/2410.05433).
 Note that this package is available for ROS1 and ROS2.
 The main branch is the ROS2 version, the ROS1 version is available in the ROS1 branch.
 
