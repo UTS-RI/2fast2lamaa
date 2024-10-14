@@ -91,22 +91,30 @@ It is based on our previous work on dynamic object detection [Dynamic Object Det
 
 2Fast-2Lamaa
 ```bibtex
-TBA
+@misc{legentil20242fast2lamaa,
+  title={2FAST-2LAMAA: A Lidar-Inertial Localisation and Mapping Framework for Non-Static Environments}, 
+  author={Le Gentil, Cedric and Falque, Raphael and Vidal-Calleja, Teresa},
+  year={2024},
+  eprint={2410.05433},
+  archivePrefix={arXiv},
+  primaryClass={cs.RO},
+  url={https://arxiv.org/abs/2410.05433}, 
+}
 ```
 
 Imu preintegration: __Continuous latent state preintegration for inertial-aided systems__ (2023)
 ```bibtex
 @article{legentil2023continuous,
-author = {Le Gentil, Cedric and Vidal-Calleja, Teresa},
-title ={Continuous latent state preintegration for inertial-aided systems},
-journal = {The International Journal of Robotics Research},
-volume = {42},
-number = {10},
-pages = {874-900},
-year = {2023},
-doi = {10.1177/02783649231199537},
-URL = { https://doi.org/10.1177/02783649231199537 },
-eprint = { https://doi.org/10.1177/02783649231199537 }
+  author = {Le Gentil, Cedric and Vidal-Calleja, Teresa},
+  title ={Continuous latent state preintegration for inertial-aided systems},
+  journal = {The International Journal of Robotics Research},
+  volume = {42},
+  number = {10},
+  pages = {874-900},
+  year = {2023},
+  doi = {10.1177/02783649231199537},
+  URL = { https://doi.org/10.1177/02783649231199537 },
+  eprint = { https://doi.org/10.1177/02783649231199537 }
 }
 ```
 
