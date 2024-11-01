@@ -46,6 +46,7 @@ class Cell {
         GridIndex index_;
         VecX alpha_;
         Vec3 sum_;
+        Vec3 color_sum_;
         Vec3 dir_sum_;
         int count_;
         int last_alpha_update = -1;
@@ -80,8 +81,10 @@ class Cell {
 
         void resetAlpha();
         void addPt(const Vec3& pt, const Vec3& pos=Vec3::Zero());
+        void addColor(const unsigned char r, const unsigned char g, const unsigned char b);
 
         Vec3 getPt() const;
+        std::tuple<unsigned char, unsigned char, unsigned char> getColor() const;
 
         bool getSign(const Vec3& pt);
 
@@ -104,7 +107,7 @@ class Cell {
 
         Vec3 getDir() const { return dir_sum_.normalized(); }
 
-        std::vector<Vec3> getNormals(const std::vector<Vec3>& pts, bool ordered=true);
+        std::vector<Vec3> getNormals(const std::vector<Vec3>& pts, bool orientate=true, bool clean_behind=false);
 
 
         void setNoiseModel(const bool use_independent_noise, const int max_count)
@@ -199,10 +202,11 @@ class MapDistField {
 
         int scan_counter_ = -1;
 
+        bool has_color_ = false;
+
         MapDistFieldOptions opt_;
 
     public:
-        std::vector<Pointd> DEBUG_points_to_remove_;
         MapDistField(const MapDistFieldOptions& options);
 
 
@@ -210,7 +214,7 @@ class MapDistField {
 
         void addPts(const std::vector<Pointd>& pts, const Mat4& pose);
         std::vector<Pointf> getPts();
-        std::pair<std::vector<Pointf>, std::vector<Vec3> > getPtsAndNormals();
+        std::pair<std::vector<Pointf>, std::vector<Vec3> > getPtsAndNormals(bool clean_behind=false);
         std::vector<double> queryDistField(const std::vector<Vec3>& query_pts, const bool field=true);
         std::vector<double> querySdf(const std::vector<Vec3>& query_pts);
         std::pair<double, Vec3> queryDistFieldAndGrad(const Vec3& query_pts, const bool field=true);

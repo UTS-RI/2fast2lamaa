@@ -78,7 +78,8 @@ enum PointFieldTypes
     X = 6,
     Y = 7,
     Z = 8,
-    NUM_TYPES = 9
+    RGB = 9,
+    NUM_TYPES = 10
 };
 
 
@@ -124,6 +125,10 @@ inline std::vector<std::pair<int, int>> getPointFields(const std::vector<sensor_
         {
             output[PointFieldTypes::Z] = {fields[i].offset , fields[i].datatype};
         }
+        else if(fields[i].name == "rgb")
+        {
+            output[PointFieldTypes::RGB] = {fields[i].offset , fields[i].datatype};
+        }
     }
     if(need_time&&(output[PointFieldTypes::TIME].first == -1))
     {
@@ -147,6 +152,14 @@ inline void preparePointCloud2Msg(sensor_msgs::PointCloud2& output, const std::v
     output.height = 1;
     output.is_bigendian = false;
     output.point_step = 37;
+    if(pts.size() == 0)
+    {
+        return;
+    }
+    if(pts[0].has_color)
+    {
+        output.point_step += 4;
+    }
     output.row_step = output.point_step * output.width;
     output.fields.resize(9);
 
@@ -186,6 +199,14 @@ inline void preparePointCloud2Msg(sensor_msgs::PointCloud2& output, const std::v
     output.fields[8].count =1;
     output.fields[8].offset = 36;
     output.fields[8].datatype = sensor_msgs::PointField::UINT8;
+    if(pts[0].has_color)
+    {
+        output.fields.resize(10);
+        output.fields[9].name = "rgb";
+        output.fields[9].count =1;
+        output.fields[9].offset = 37;
+        output.fields[9].datatype = sensor_msgs::PointField::FLOAT32;
+    }
 
 
     output.row_step = output.point_step * output.width;
@@ -210,6 +231,12 @@ inline sensor_msgs::PointCloud2 ptsVecToPointCloud2MsgInternal(const std::vector
         memcpy(&(output.data[(output.point_step*i) + 28]), &(pts[i].channel), sizeof(int));
         memcpy(&(output.data[(output.point_step*i) + 32]), &(pts[i].type), sizeof(int));
         output.data[(output.point_step*i) + 36] = pts[i].dynamic;
+        if(pts[i].has_color)
+        {
+            memcpy(&(output.data[(output.point_step*i) + 39]), &(pts[i].r), sizeof(unsigned char));
+            memcpy(&(output.data[(output.point_step*i) + 38]), &(pts[i].g), sizeof(unsigned char));
+            memcpy(&(output.data[(output.point_step*i) + 37]), &(pts[i].b), sizeof(unsigned char));
+        }
     }
     return output;
 }
@@ -234,6 +261,12 @@ inline sensor_msgs::PointCloud2 ptsVecToPointCloud2MsgInternal(const std::vector
         memcpy(&(output.data[(output.point_step*i) + 28]), &(pts[i].channel), sizeof(int));
         memcpy(&(output.data[(output.point_step*i) + 32]), &(pts[i].type), sizeof(int));
         output.data[(output.point_step*i) + 36] = pts[i].dynamic;
+        if(pts[i].has_color)
+        {
+            memcpy(&(output.data[(output.point_step*i) + 39]), &(pts[i].r), sizeof(unsigned char));
+            memcpy(&(output.data[(output.point_step*i) + 38]), &(pts[i].g), sizeof(unsigned char));
+            memcpy(&(output.data[(output.point_step*i) + 37]), &(pts[i].b), sizeof(unsigned char));
+        }
     }
     return output;
 }
@@ -249,6 +282,7 @@ inline std::vector<Pointd> pointCloud2MsgToPtsVecInternal(const sensor_msgs::Poi
 {
     std::vector<Pointd> output;
     output.resize(msg->width*msg->height);
+    bool has_color = (msg->fields.size() > 9);
     for(size_t i=0; i < output.size(); ++i)
     {
         float temp_x, temp_y, temp_z;
@@ -264,6 +298,14 @@ inline std::vector<Pointd> pointCloud2MsgToPtsVecInternal(const sensor_msgs::Poi
         memcpy(&(output[i].channel), &(msg->data[(msg->point_step*i) + 28]), sizeof(int));
         memcpy(&(output[i].type), &(msg->data[(msg->point_step*i) + 32]), sizeof(int));
         output[i].dynamic = msg->data[(msg->point_step*i) + 36];
+        if(has_color)
+        {
+            output[i].r = msg->data[(msg->point_step*i) + 39];
+            output[i].g = msg->data[(msg->point_step*i) + 38];
+            output[i].b = msg->data[(msg->point_step*i) + 37];
+            output[i].has_color = true;
+        }
+
     }
     return output;
 }
@@ -272,6 +314,7 @@ inline std::vector<Pointf> pointCloud2MsgToPtsVecInternalFloat(const sensor_msgs
 {
     std::vector<Pointf> output;
     output.resize(msg->width*msg->height);
+    bool has_color = (msg->fields.size() > 9);
     for(size_t i=0; i < output.size(); ++i)
     {
         memcpy(&(output[i].x), &(msg->data[(msg->point_step*i) + 0]), sizeof(float));
@@ -283,6 +326,13 @@ inline std::vector<Pointf> pointCloud2MsgToPtsVecInternalFloat(const sensor_msgs
         memcpy(&(output[i].channel), &(msg->data[(msg->point_step*i) + 28]), sizeof(int));
         memcpy(&(output[i].type), &(msg->data[(msg->point_step*i) + 32]), sizeof(int));
         output[i].dynamic = msg->data[(msg->point_step*i) + 36];
+        if(has_color)
+        {
+            output[i].r = msg->data[(msg->point_step*i) + 39];
+            output[i].g = msg->data[(msg->point_step*i) + 38];
+            output[i].b = msg->data[(msg->point_step*i) + 37];
+            output[i].has_color = true;
+        }
     }
     return output;
 }
@@ -300,6 +350,7 @@ inline std::tuple<std::vector<PointTemplated<T> >, bool, bool> pointCloud2MsgToP
     bool has_scan_id = (fields[PointFieldTypes::SCAN_ID].first != -1);
     bool has_dynamic = (fields[PointFieldTypes::DYNAMIC].first != -1);
     bool has_time = (fields[PointFieldTypes::TIME].first != -1);
+    bool has_color = (fields[PointFieldTypes::RGB].first != -1);
     for(size_t i = 0; i < output.size(); ++i)
     {
         float temp_x, temp_y, temp_z;
@@ -394,6 +445,13 @@ inline std::tuple<std::vector<PointTemplated<T> >, bool, bool> pointCloud2MsgToP
         if(has_dynamic)
         {
             output[i].dynamic = msg->data[(msg->point_step*i) + fields[PointFieldTypes::DYNAMIC].first];
+        }
+        if(has_color)
+        {
+            memcpy(&(output[i].r),&(msg->data[(msg->point_step*i) + fields[PointFieldTypes::RGB].first + 2]), sizeof(uint8_t));
+            memcpy(&(output[i].g),&(msg->data[(msg->point_step*i) + fields[PointFieldTypes::RGB].first + 1]), sizeof(uint8_t));
+            memcpy(&(output[i].b),&(msg->data[(msg->point_step*i) + fields[PointFieldTypes::RGB].first + 0]), sizeof(uint8_t));
+            output[i].has_color = true;
         }
     }
     return {output, has_intensity, has_channel};

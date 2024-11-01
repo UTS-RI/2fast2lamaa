@@ -54,6 +54,7 @@ Cell::Cell(GridIndex index, Vec3 pt, const GPCellHyperparameters& hyperparameter
     hyperparameters_(hyperparameters)
     , index_(index)
     , sum_(pt)
+    , color_sum_(Vec3::Zero())
     , dir_sum_((pos-pt).normalized())
     , count_(1)
     , global_counter_(global_counter)
@@ -70,10 +71,19 @@ void Cell::addPt(const Vec3& pt, const Vec3& pos)
     dir_sum_ += (pos-pt).normalized();
     count_++;
 }
+void Cell::addColor(const unsigned char r, const unsigned char g, const unsigned char b)
+{
+    color_sum_ += Vec3(r, g, b);
+}
 
 Vec3 Cell::getPt() const
 {
     return sum_/count_;
+}
+
+std::tuple<unsigned char, unsigned char, unsigned char> Cell::getColor() const
+{
+    return std::make_tuple(color_sum_[0]/count_, color_sum_[1]/count_, color_sum_[2]/count_);
 }
 
 GridIndex Cell::getIndex() const
@@ -317,7 +327,7 @@ bool Cell::getSign(const Vec3& pt)
 }
 
 
-std::vector<Vec3> Cell::getNormals(const std::vector<Vec3>& pts, bool orientate)
+std::vector<Vec3> Cell::getNormals(const std::vector<Vec3>& pts, bool orientate, bool clean_behind)
 {
     std::vector<Vec3> normals(pts.size());
     for(size_t i = 0; i < pts.size(); i++)
@@ -343,6 +353,10 @@ std::vector<Vec3> Cell::getNormals(const std::vector<Vec3>& pts, bool orientate)
         if(orientate && occ_grad.dot(dir_sum_) < 0)
         {
             normals[i] = -occ_grad;
+        }
+        if(clean_behind)
+        {
+            resetAlpha();
         }
     }
     return normals;
@@ -466,6 +480,15 @@ Mat4 MapDistField::registerPts(const std::vector<Vec3>& pts, const Mat4& pose, c
 
 void MapDistField::addPts(const std::vector<Pointd>& pts, const Mat4& pose)
 {
+    if (pts.size() == 0)
+    {
+        return;
+    }
+    if(scan_counter_ < 0)
+    {
+        has_color_ = pts[0].has_color;
+    }
+
     scan_counter_++;
     StopWatch sw;
 
@@ -600,12 +623,6 @@ void MapDistField::addPts(const std::vector<Pointd>& pts, const Mat4& pose)
             }
 
 
-            DEBUG_points_to_remove_.clear();
-            for(auto& map_pt : map_pts_to_remove)
-            {
-                DEBUG_points_to_remove_.push_back(Pointd(map_pt.second->getPt(), 0));
-            }
-
             sw.stop();
             sw.print("Free space carving time");
         }
@@ -647,10 +664,18 @@ void MapDistField::addPts(const std::vector<Pointd>& pts, const Mat4& pose)
             num_cells_++;
             temp_pt = getCenterPt(index);
             phtree_.emplace({temp_pt[0], temp_pt[1], temp_pt[2]}, cell_ptr);
+            if(has_color_)
+            {
+                cell_ptr->addColor(pts[i].r, pts[i].g, pts[i].b);
+            }
         }
         else
         {
             hash_map_->at(index)->addPt(temp_pt, pose.block<3,1>(0,3));
+            if(has_color_)
+            {
+                hash_map_->at(index)->addColor(pts[i].r, pts[i].g, pts[i].b);
+            }
         }
     }
     sw.stop();
@@ -680,12 +705,21 @@ std::vector<Pointf> MapDistField::getPts()
     for (auto& pair : *hash_map_)
     {
         Vec3 pt = pair.second->getPt();
-        pts.push_back(Pointf(float(pt[0]), float(pt[1]), float(pt[2]), 0.0, pair.second->getCount()));
+        int count = pair.second->getCount();
+        pts.push_back(Pointf(float(pt[0]), float(pt[1]), float(pt[2]), 0.0, count));
+        if(has_color_)
+        {
+            auto [r, g, b] = pair.second->getColor();
+            pts.back().r = r;
+            pts.back().g = g;
+            pts.back().b = b;
+            pts.back().has_color = true;
+        }
     }
     return pts;
 }
 
-std::pair<std::vector<Pointf>, std::vector<Vec3> > MapDistField::getPtsAndNormals()
+std::pair<std::vector<Pointf>, std::vector<Vec3> > MapDistField::getPtsAndNormals(bool clean_behind)
 {
     std::vector<Pointf> pts;
     std::vector<Vec3> normals;
@@ -710,7 +744,15 @@ std::pair<std::vector<Pointf>, std::vector<Vec3> > MapDistField::getPtsAndNormal
     {
         Vec3 pt = cells[i]->getPt();
         pts[i] = Pointf(float(pt[0]), float(pt[1]), float(pt[2]), 0.0, cells[i]->getCount(), cells[i]->hasNeighbors());
-        normals[i] = cells[i]->getNormals({pt})[0];
+        if(has_color_)
+        {
+            auto [r, g, b] = cells[i]->getColor();
+            pts[i].r = r;
+            pts[i].g = g;
+            pts[i].b = b;
+            pts[i].has_color = true;
+        }
+        normals[i] = cells[i]->getNormals({pt}, true, clean_behind)[0];
     }
     return {pts, normals};
 }
@@ -873,7 +915,7 @@ void MapDistField::writeMap(const std::string& filename)
     std::vector<Vec3> normals;
     if(opt_.output_normals || opt_.output_mesh)
     {
-        std::tie(pts, normals) = getPtsAndNormals();
+        std::tie(pts, normals) = getPtsAndNormals(true);
     }
     else
     {
@@ -885,6 +927,7 @@ void MapDistField::writeMap(const std::string& filename)
         std::vector<Eigen::Matrix<Real,3,1> > pts_eigen;
         pts_eigen.reserve(pts.size());
         std::vector<Eigen::Matrix<Real,3,1> > normals_eigen;
+        std::vector<std::array<unsigned char, 3> > colors;
         normals_eigen.reserve(normals.size());
         std::array<Real, 3> min_bounds = {std::numeric_limits<Real>::max(), std::numeric_limits<Real>::max(), std::numeric_limits<Real>::max()};
         std::array<Real, 3> max_bounds = {std::numeric_limits<Real>::lowest(), std::numeric_limits<Real>::lowest(), std::numeric_limits<Real>::lowest()};
@@ -894,6 +937,11 @@ void MapDistField::writeMap(const std::string& filename)
             {
                 pts_eigen.push_back(pts[i].vec3().cast<Real>());
                 normals_eigen.push_back(normals[i].normalized().cast<Real>());
+
+                if(has_color_)
+                {
+                    colors.push_back({pts[i].r, pts[i].g, pts[i].b});
+                }
 
                 for(int j = 0; j < 3; j++)
                 {
@@ -910,7 +958,11 @@ void MapDistField::writeMap(const std::string& filename)
         happly::PLYData ply_out;
         ply_out.addVertexPositions(pts_eigen);
         ply_out.addVertexNormals(normals_eigen);
-        ply_out.write(filename, happly::DataFormat::Binary);
+        if(has_color_)
+        {
+            ply_out.addVertexColors(colors);
+        }
+        ply_out.write(filename, happly::DataFormat::ASCII);
         sw.stop();
         sw.print("Time to write map with normals to file ");
 
@@ -932,11 +984,38 @@ void MapDistField::writeMap(const std::string& filename)
             std::cout << "Octree depth: " << octree_depth << std::endl;
             PoissonReconWrapped poisson_recon(pts_eigen, normals_eigen, octree_depth, 5, 1.1, opt_.meshing_point_per_node);
             auto [mesh_v, mesh_f] = poisson_recon.reconstruct();
+            std::vector<std::array<unsigned char, 3> > mesh_colors(mesh_v.size(), {0, 0, 0});
             sw.stop();
             sw.print("Time to reconstruct mesh");
 
             sw.reset();
             sw.start();
+
+            // Ugly fix for the mesh color: fetch the color from the closest point of the vertex
+            if(has_color_)
+            {
+                #pragma omp parallel for num_threads(16)
+                for(size_t i = 0; i < mesh_v.size(); i++)
+                {
+                    CellPtr closest_cell;
+                    for(auto nn= phtree_.begin_knn_query(1, {mesh_v[i][0], mesh_v[i][1], mesh_v[i][2]}, DistancePh()); nn != phtree_.end(); ++nn)
+                    {
+                        closest_cell = nn.second();
+                    }
+                    if(closest_cell)
+                    {
+                        auto [r, g, b] = closest_cell->getColor();
+                        mesh_colors[i] = {r, g, b};
+                    }
+                    else
+                    {
+                        mesh_colors[i] = {0,0,0};
+                    }
+                }
+            }
+                    
+                
+
 
             if(opt_.clean_mesh_threshold > 0.0)
             {
@@ -997,6 +1076,7 @@ void MapDistField::writeMap(const std::string& filename)
                 ankerl::unordered_dense::map<int, int> v_id_map;
                 std::vector<Eigen::Matrix<Real,3,1> > mesh_v_clean;
                 std::vector<Eigen::Matrix<int,3,1> > mesh_f_clean;
+                std::vector<std::array<unsigned char, 3> > mesh_colors_clean;
                 int v_id = 0;
                 for(size_t i = 0; i < mesh_f.size(); i++)
                 {
@@ -1009,6 +1089,7 @@ void MapDistField::writeMap(const std::string& filename)
                             {
                                 v_id_map[mesh_f[i][j]] = v_id;
                                 mesh_v_clean.push_back(mesh_v[mesh_f[i][j]]);
+                                mesh_colors_clean.push_back(mesh_colors[mesh_f[i][j]]);
                                 face[j] = v_id;
                                 v_id++;
                             }
@@ -1028,6 +1109,7 @@ void MapDistField::writeMap(const std::string& filename)
 
                 mesh_v = mesh_v_clean;
                 mesh_f = mesh_f_clean;
+                mesh_colors = mesh_colors_clean;
             }
 
 
@@ -1038,6 +1120,10 @@ void MapDistField::writeMap(const std::string& filename)
             //ply_out_mesh.addFaceIndices(mesh_f);
             ply_out_mesh.addVertexPositions(mesh_v);
             ply_out_mesh.addFaceIndices(mesh_f);
+            if(has_color_)
+            {
+                ply_out_mesh.addVertexColors(mesh_colors);
+            }
             std::string folder_name = filename.substr(0, filename.find_last_of("/"));
             ply_out_mesh.write(folder_name + "/mesh.ply", happly::DataFormat::Binary);
 
@@ -1048,17 +1134,27 @@ void MapDistField::writeMap(const std::string& filename)
     else
     {
         std::vector<Eigen::Matrix<Real,3,1> > pts_eigen;
+        std::vector<std::array<unsigned char, 3> > colors;
         pts_eigen.reserve(pts.size());
         for(size_t i = 0; i < pts.size(); i++)
         {
             Vec3f pt = pts[i].vec3();
             pts_eigen.push_back(Eigen::Matrix<Real,3,1>(pt[0], pt[1], pt[2]));
+            if(has_color_)
+            {
+
+                colors.push_back({pts[i].r, pts[i].g, pts[i].b});
+            }
         }
 
         sw.reset();
         sw.start();
         happly::PLYData ply_out;
         ply_out.addVertexPositions(pts_eigen);
+        if(has_color_)
+        {
+            ply_out.addVertexColors(colors);
+        }
         ply_out.write(filename, happly::DataFormat::Binary);
         sw.stop();
         sw.print("Time to write map to file ");

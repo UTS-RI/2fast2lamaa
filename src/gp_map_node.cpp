@@ -136,8 +136,6 @@ class GpMapNode
             query_dist_field_srv_ = nh.advertiseService("/query_dist_field", &GpMapNode::queryDistFieldCallback, this);
 
 
-            DEBUG_pub_ = nh.advertise<sensor_msgs::PointCloud2>("/DEBUG", 10);
-
         }
 
         ~GpMapNode()
@@ -180,7 +178,6 @@ class GpMapNode
         ros::ServiceServer query_dist_field_srv_;
 
 
-        ros::Publisher DEBUG_pub_;
 
 
 
@@ -388,16 +385,11 @@ class GpMapNode
             // Add the points to the map
             map_->addPts(pts, current_pose_);
 
-            std::vector<Pointd> DEBUG_pts = map_->DEBUG_points_to_remove_;
-            // Publish DEBUG points
-            sensor_msgs::PointCloud2 DEBUG_msg = ptsVecToPointCloud2MsgInternal(DEBUG_pts, "map", ros::Time::now());
-            DEBUG_pub_.publish(DEBUG_msg);
-
-
             map_mutex_.unlock();
 
             sw.stop();
             sw.print("Adding points to map time");
+
             counter_++;
             last_pc_epoch_time_mutex_.lock();
             last_pc_epoch_time_ = std::chrono::high_resolution_clock::now();
