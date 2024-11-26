@@ -122,15 +122,21 @@ VecX Cell::getWeights(const MatX& pts) const
 }
 
 
-MatX Cell::computeAlpha()
+MatX Cell::computeAlpha(bool clean_behind)
 {
     MatX pts = getNeighborPts(true);
     MatX weights = getWeights(pts).asDiagonal();
+    double max_count = pts.col(3).maxCoeff();
+    normal_weight_ = std::max(1.0,1.0-(1.0 / (1.0+std::exp(12.0*(count_/max_count)-6.0)))+0.005);
     MatX K = kernelRQ(pts.block(0,0,pts.rows(),3), pts.block(0,0,pts.rows(),3)) + weights;
     VecX Y = VecX::Ones(pts.rows());
     alpha_.resize(pts.rows());
     alpha_ = solveKinvY(K, Y);
     last_alpha_update = global_counter_;
+    if(!clean_behind)
+    {
+        map_->cellToClean(this);
+    }
     return pts.block(0, 0, pts.rows(), 3);
 }
 
@@ -327,7 +333,7 @@ bool Cell::getSign(const Vec3& pt)
 }
 
 
-std::vector<Vec3> Cell::getNormals(const std::vector<Vec3>& pts, bool orientate, bool clean_behind)
+std::vector<Vec3> Cell::getNormals(const std::vector<Vec3>& pts, bool orientate, bool clean_behind, bool weighted)
 {
     std::vector<Vec3> normals(pts.size());
     for(size_t i = 0; i < pts.size(); i++)
@@ -337,7 +343,7 @@ std::vector<Vec3> Cell::getNormals(const std::vector<Vec3>& pts, bool orientate,
             mutex_.lock();
             if(global_counter_ != last_alpha_update)
             {
-                neighbor_pts_ = computeAlpha();
+                neighbor_pts_ = computeAlpha(clean_behind);
             }
             mutex_.unlock();
             auto [k, k_diff_1, k_diff_2, k_diff_3] = kernelRQAndDiff(pts[i].transpose(), neighbor_pts_);
@@ -357,6 +363,10 @@ std::vector<Vec3> Cell::getNormals(const std::vector<Vec3>& pts, bool orientate,
         if(clean_behind)
         {
             resetAlpha();
+        }
+        if(weighted)
+        {
+            normals[i] *= normal_weight_;
         }
     }
     return normals;
@@ -437,14 +447,15 @@ Mat4 MapDistField::registerPts(const std::vector<Vec3>& pts, const Mat4& pose, c
     sw.stop();
     sw.print("Time to compute weights");
 
-    RegistrationCostFunction* cost_function = new RegistrationCostFunction(pts, pose, this, weights, 1.5*cell_size_, false, use_loss);
+    auto temp_pose = pose;
+
+    RegistrationCostFunction* cost_function = new RegistrationCostFunction(pts, temp_pose, this, weights, 1.5*cell_size_, false, use_loss);
     problem.AddResidualBlock(cost_function, NULL, pose_correction_state.data());
 
     ceres::Solver::Options options;
     options.linear_solver_type = ceres::DENSE_NORMAL_CHOLESKY;
     options.max_num_iterations = approximate ? 15 : 10;
     options.function_tolerance = 1e-4;
-    //options.check_gradients = true;
     ceres::Solver::Summary summary;
     ceres::Solve(options, &problem, &summary);
     std::cout << summary.FullReport() << std::endl;
@@ -452,7 +463,6 @@ Mat4 MapDistField::registerPts(const std::vector<Vec3>& pts, const Mat4& pose, c
 
     if(!approximate)
     {
-        
         cost_function->setUseField(true);
 
         options.max_num_iterations = 2;
@@ -472,14 +482,35 @@ Mat4 MapDistField::registerPts(const std::vector<Vec3>& pts, const Mat4& pose, c
 
     num_neighbors_ = num_neighbors_save;
 
-    return pose*pose_correction;
+    return temp_pose*pose_correction;
 }
 
 
 
 
+void MapDistField::cellToClean(Cell* cell)
+{
+    clean_mutex_.lock();
+    cells_to_clean_.insert(cell);
+    clean_mutex_.unlock();
+}
+
+void MapDistField::cleanCells()
+{
+    clean_mutex_.lock();
+    for(auto& cell : cells_to_clean_)
+    {
+        cell->resetAlpha();
+    }
+    cells_to_clean_.clear();
+    clean_mutex_.unlock();
+}
+
+
+
 void MapDistField::addPts(const std::vector<Pointd>& pts, const Mat4& pose)
 {
+    cleanCells();
     if (pts.size() == 0)
     {
         return;
@@ -719,7 +750,7 @@ std::vector<Pointf> MapDistField::getPts()
     return pts;
 }
 
-std::pair<std::vector<Pointf>, std::vector<Vec3> > MapDistField::getPtsAndNormals(bool clean_behind)
+std::pair<std::vector<Pointf>, std::vector<Vec3> > MapDistField::getPtsAndNormals(bool clean_behind, bool weighted)
 {
     std::vector<Pointf> pts;
     std::vector<Vec3> normals;
@@ -752,11 +783,29 @@ std::pair<std::vector<Pointf>, std::vector<Vec3> > MapDistField::getPtsAndNormal
             pts[i].b = b;
             pts[i].has_color = true;
         }
-        normals[i] = cells[i]->getNormals({pt}, true, clean_behind)[0];
+        normals[i] = cells[i]->getNormals({pt}, true, clean_behind, weighted)[0];
     }
     return {pts, normals};
 }
 
+std::pair<std::vector<Vec3>, std::vector<Vec3> > MapDistField::getClosestPtAndNormal(const std::vector<Vec3>& pts, const bool clean_behind)
+{
+    std::vector<Vec3> closest_pts(pts.size());
+    std::vector<Vec3> normals(pts.size());
+    #pragma omp parallel for num_threads(10)
+    for(size_t i = 0; i < pts.size(); i++)
+    {
+        auto cell = getClosestCell(pts[i]);
+        closest_pts[i] = cell->getPt();
+        normals[i] = cell->getNormals({pts[i]}, true, clean_behind, false)[0];
+        // Check if there is a nan in the normal
+        if(!std::isfinite(normals[i][0]) || !std::isfinite(normals[i][1]) || !std::isfinite(normals[i][2]))
+        {
+            normals[i] = Vec3::Zero();
+        }
+    }
+    return {closest_pts, normals};
+}
 
 
 
@@ -868,6 +917,22 @@ double MapDistField::distToClosestCell(const Vec3& pt) const
 }
 
 
+CellPtr MapDistField::getClosestCell(const Vec3& pt) const
+{
+    CellPtr closest_cell;
+    double dist = std::numeric_limits<double>::max();
+    for(auto nn= phtree_.begin_knn_query(num_neighbors_, {pt[0], pt[1], pt[2]}, DistancePh()); nn != phtree_.end(); ++nn)
+    {
+        double temp_dist = (pt - nn.second()->getPt()).norm();
+        if(temp_dist < dist)
+        {
+            dist = temp_dist;
+            closest_cell = nn.second();
+        }
+    }
+    return closest_cell;
+}
+
 
 
 
@@ -915,7 +980,7 @@ void MapDistField::writeMap(const std::string& filename)
     std::vector<Vec3> normals;
     if(opt_.output_normals || opt_.output_mesh)
     {
-        std::tie(pts, normals) = getPtsAndNormals(true);
+        std::tie(pts, normals) = getPtsAndNormals(true, opt_.poisson_weighted);
     }
     else
     {
@@ -962,7 +1027,7 @@ void MapDistField::writeMap(const std::string& filename)
         {
             ply_out.addVertexColors(colors);
         }
-        ply_out.write(filename, happly::DataFormat::ASCII);
+        ply_out.write(filename, happly::DataFormat::Binary);
         sw.stop();
         sw.print("Time to write map with normals to file ");
 
@@ -982,7 +1047,7 @@ void MapDistField::writeMap(const std::string& filename)
             // Get the octree depth
             int octree_depth = std::ceil(std::log2(max_range/(cell_size_/3.0)));
             std::cout << "Octree depth: " << octree_depth << std::endl;
-            PoissonReconWrapped poisson_recon(pts_eigen, normals_eigen, octree_depth, 5, 1.1, opt_.meshing_point_per_node);
+            PoissonReconWrapped poisson_recon(pts_eigen, normals_eigen, octree_depth, 5, 1.1, opt_.meshing_point_per_node, opt_.poisson_weighted);
             auto [mesh_v, mesh_f] = poisson_recon.reconstruct();
             std::vector<std::array<unsigned char, 3> > mesh_colors(mesh_v.size(), {0, 0, 0});
             sw.stop();
@@ -1235,7 +1300,7 @@ bool RegistrationCostFunction::Evaluate(double const* const* parameters, double*
                 loss_function_->Evaluate(dist, temp.data());
                 residuals[i] = temp[0] * weights_[i];
 
-                Row3 d_dist_d_rot = -temp[1]*grad.transpose()*R_prior*(toSkewSymMat(pts_corr.col(i)))*J_rot;
+                Row3 d_dist_d_rot = -temp[1]*grad.transpose()*R_prior*(toSkewSymMat(pts_corr.col(i)-pos))*J_rot;
                 Row3 d_dist_d_pos = temp[1]*grad.transpose()*R_prior;
 
                 jacobian.block<1,3>(i, 0) = weights_[i] * d_dist_d_pos;

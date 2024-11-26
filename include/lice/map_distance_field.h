@@ -55,15 +55,18 @@ class Cell {
         const int& global_counter_;
         double first_time_ = -1.0;
         MapDistField* map_;
+        double normal_weight_ = 1.0;
 
         bool use_weights_ = true;
         int max_count_ = 0;
 
-        MatX computeAlpha();
+        MatX computeAlpha(bool clean_behind=false);
 
         MatX getNeighborPts(bool with_count=false);
 
         VecX getWeights(const MatX& pts) const;
+
+        double getCellWeight() const;
 
     public:
         Cell(GridIndex index, Vec3 pt, const GPCellHyperparameters& hyperparameters, const int& global_counter=0, const double first_time=-1.0, const Vec3& pos=Vec3::Zero(), MapDistField* map=nullptr);
@@ -107,7 +110,7 @@ class Cell {
 
         Vec3 getDir() const { return dir_sum_.normalized(); }
 
-        std::vector<Vec3> getNormals(const std::vector<Vec3>& pts, bool orientate=true, bool clean_behind=false);
+        std::vector<Vec3> getNormals(const std::vector<Vec3>& pts, bool orientate=true, bool clean_behind=false, bool weighted=false);
 
 
         void setNoiseModel(const bool use_independent_noise, const int max_count)
@@ -170,6 +173,7 @@ struct MapDistFieldOptions {
     bool output_mesh = false;
     double clean_mesh_threshold = 0.0;
     double meshing_point_per_node = 2.0;
+    double poisson_weighted = false;
 };
     
 
@@ -187,6 +191,8 @@ class MapDistField {
         const float half_cell_size_f_;
         const int dim_ = 3;
 
+        std::mutex clean_mutex_;
+        ankerl::unordered_dense::set<Cell*> cells_to_clean_;
 
         Vec3 min_bounds_ = Vec3(std::numeric_limits<double>::max(), std::numeric_limits<double>::max(), std::numeric_limits<double>::max());
         Vec3 max_bounds_ = Vec3(std::numeric_limits<double>::lowest(), std::numeric_limits<double>::lowest(), std::numeric_limits<double>::lowest());
@@ -206,6 +212,9 @@ class MapDistField {
 
         MapDistFieldOptions opt_;
 
+        void cleanCells();
+
+
     public:
         MapDistField(const MapDistFieldOptions& options);
 
@@ -214,12 +223,14 @@ class MapDistField {
 
         void addPts(const std::vector<Pointd>& pts, const Mat4& pose);
         std::vector<Pointf> getPts();
-        std::pair<std::vector<Pointf>, std::vector<Vec3> > getPtsAndNormals(bool clean_behind=false);
+        std::pair<std::vector<Pointf>, std::vector<Vec3> > getPtsAndNormals(bool clean_behind=false, bool weighted=false);
         std::vector<double> queryDistField(const std::vector<Vec3>& query_pts, const bool field=true);
         std::vector<double> querySdf(const std::vector<Vec3>& query_pts);
         std::pair<double, Vec3> queryDistFieldAndGrad(const Vec3& query_pts, const bool field=true);
         double queryDistField(const Vec3& query_pt, const bool field=true);
         double querySdf(const Vec3& query_pt);
+
+        std::pair<std::vector<Vec3>, std::vector<Vec3> > getClosestPtAndNormal(const std::vector<Vec3>& query_pts, const bool clean_behind=false); 
 
         double getAvgTime(const Vec3& pt);
 
@@ -238,7 +249,11 @@ class MapDistField {
 
         double distToClosestCell(const Vec3& pt) const;
 
+        CellPtr getClosestCell(const Vec3& pt) const;
+
         std::vector<CellPtr> getNeighborCells(const Vec3& pt);
+        
+        void cellToClean(Cell* cell);
 };
 
 //inline void testMapDistField()

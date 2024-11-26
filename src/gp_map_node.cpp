@@ -55,7 +55,7 @@ class GpMapNode
 
             double voxel_size = readRequiredField<double>(nh, "voxel_size");
             options.cell_size = voxel_size;
-            downsample_size_ = 3.0 * voxel_size;
+            downsample_size_ = readField<double>(nh, "voxel_size_factor_for_registration", 5.0) * voxel_size;
             half_voxel_size_sq_ = std::pow(voxel_size / 2.0,2);
             options.neighborhood_size = readRequiredField<int>(nh, "neighbourhood_size");
 
@@ -107,6 +107,7 @@ class GpMapNode
             options.output_mesh = readField<bool>(nh, "output_mesh", false);
             options.clean_mesh_threshold = readField<double>(nh, "clean_mesh_threshold", 2.0*voxel_size);
             options.meshing_point_per_node = readField<double>(nh, "meshing_point_per_node", 2.0);
+            options.poisson_weighted = readField<bool>(nh, "poisson_weighted", false);
 
             pc_type_internal_ = readField<bool>(nh, "point_cloud_internal_type", false);
 
@@ -314,12 +315,8 @@ class GpMapNode
                     else
                     {
                         std::tuple<Vec3, Vec3, int>& temp = pts_map[idx];
-                        double dist = (pt.vec3() - std::get<0>(temp)).squaredNorm();
-                        if(dist < half_voxel_size_sq_)
-                        {
-                            std::get<1>(temp) = std::get<1>(temp) + pt.vec3();
-                            std::get<2>(temp)++;
-                        }
+                        std::get<1>(temp) = std::get<1>(temp) + pt.vec3();
+                        std::get<2>(temp)++;
                     }
                 }
                 std::vector<Vec3> downsampled_pts;

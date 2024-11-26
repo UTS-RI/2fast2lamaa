@@ -202,6 +202,7 @@ PoissonReconWrapped::PoissonReconWrapped(
 	,unsigned int adaptive_depth
 	,double scale
 	,double min_samples_per_node
+	,bool use_confidence
 	,double interpolation_weight
 	,unsigned int gauss_seidel_iterations
 	):
@@ -222,8 +223,16 @@ PoissonReconWrapped::PoissonReconWrapped(
 	sParams_.outputDensity = false;
 	sParams_.exactInterpolation = false;
 	sParams_.showResidual = false;
-	sParams_.confidence = (Real)0.0;
-	sParams_.confidenceBias = (Real)0.0;
+	if (use_confidence)
+	{
+		sParams_.confidence = (Real)1.0;
+		sParams_.confidenceBias = (Real)0.5;
+	}
+	else
+	{
+		sParams_.confidence = (Real)0.0;
+		sParams_.confidenceBias = (Real)0.0;
+	}
 	sParams_.lowDepthCutOff = (Real)0.0;
 	sParams_.width = (Real)0.0;
 	sParams_.cgSolverAccuracy = (Real)0.001;

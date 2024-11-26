@@ -1,0 +1,30 @@
+<launch>
+  <!-- Node for scan_maker -->
+  <node pkg="ffastllamaa" type="gp_map" name="gp_map" output="screen">
+    <remap from="/points_input" to="/camera/depth/color/points"/>
+    <param name="point_cloud_internal_type" value="false"/>
+    <param name="voxel_size" value="0.01"/>
+    <param name="neighbourhood_size" value="3"/>
+    <param name="register" value="true"/>
+    <param name="register_with_approximate_field" value="true"/>
+    <param name="voxel_size_factor_for_registration" value="5.0"/>
+    <param name="max_num_pts_for_registration" value="8000"/>
+    <param name="use_temporal_weights" value="false"/>
+    <param name="with_prior" value="false"/>
+    <param name="map_publish_period" value="0.5"/>
+    <param name="key_framing" value="false"/>
+    <param name="min_range" value="0.1"/>
+    <param name="max_range" value="1.5"/>
+    <param name="free_space_carving_radius" value="-20.0"/>
+    <param name="map_path" value="$(find ffastllamaa)/maps/"/>
+    <param name="output_normals" value="true"/>
+    <param name="output_mesh" value="true"/>
+    <param name="meshing_point_per_node" value="2.0"/>
+  </node>
+
+  <!--node pkg="ffastllamaa" type="field_visualiser" name="field_visualiser" output="screen">
+    <param name="range" value="5.0"/>
+    <param name="resolution" value="0.2"/>
+  </node-->
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find ffastllamaa)/cfg/rviz_config.rviz" output="screen" />
+</launch>

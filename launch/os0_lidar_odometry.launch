@@ -45,7 +45,8 @@
     <param name="neighbourhood_size" value="2"/>
     <param name="register" value="true"/>
     <param name="register_with_approximate_field" value="false"/>
-    <param name="max_num_pts_for_registration" value="8000"/>
+    <param name="voxel_size_factor_for_registration" value="5.0"/>
+    <param name="max_num_pts_for_registration" value="2000"/>
     <param name="use_temporal_weights" value="true"/>
     <param name="with_prior" value="true"/>
     <param name="map_publish_period" value="0.5"/>
@@ -60,6 +61,7 @@
     <param name="output_normals" value="true"/>
     <param name="output_mesh" value="true"/>
     <param name="meshing_point_per_node" value="2.0"/>
+    <param name="poisson_weighted" value="false"/>
   </node>
 
   <node pkg="ffastllamaa" type="field_visualiser" name="field_visualiser" output="screen">

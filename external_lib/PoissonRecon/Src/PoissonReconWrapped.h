@@ -98,6 +98,7 @@ class PoissonReconWrapped
 			,unsigned int adaptive_depth = 5
 			,double scale = 1.1
 			,double min_samples_per_node = 2.0
+			,bool use_confidence = false
 			,double interpolation_weight = 4.0
 			,unsigned int gauss_seidel_iterations = 8
 			);
