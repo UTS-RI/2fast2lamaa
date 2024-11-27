@@ -31,7 +31,7 @@ DAMAGE.
 #include "PoissonReconWrapped.h"
 
 template< typename Real , unsigned int Dim , unsigned int FEMSig , bool HasGradients , bool HasDensity >
-std::pair<std::vector<Eigen::Vector<Real,3> >, std::vector<Eigen::Vector<int,3> > > PoissonReconWrapped::getMesh
+std::pair<std::vector<Eigen::Matrix<Real,3,1> >, std::vector<Eigen::Matrix<int,3,1> > > PoissonReconWrapped::getMesh
 (
 	Reconstructor::Implicit< Real , Dim , FEMSig > &implicit ,
 	const Reconstructor::LevelSetExtractionParameters &meParams
@@ -58,18 +58,18 @@ std::pair<std::vector<Eigen::Vector<Real,3> >, std::vector<Eigen::Vector<int,3> 
 	}
 
 	vertexStream.reset();
-	std::vector< Eigen::Vector<Real,3> > vertices;
+	std::vector< Eigen::Matrix<Real,3,1> > vertices;
 	size_t vertexCount = vertexStream.size();
 	vertices.reserve( vertexCount );
 	for( size_t i=0; i<vertexCount ; i++ )
 	{
 		typename Factory::VertexType vertex = factory();
 		if( !vertexStream.read( vertex ) ) ERROR_OUT( "Failed to read vertex " , i , " / " , 10 );
-		vertices.push_back( Eigen::Vector<Real,3>( vertex[0] , vertex[1] , vertex[2] ) );
+		vertices.push_back( Eigen::Matrix<Real,3,1>( vertex[0] , vertex[1] , vertex[2] ) );
 	}
 
 	faceStream.reset();
-	std::vector< Eigen::Vector<int,3> > faces;
+	std::vector< Eigen::Matrix<int,3,1> > faces;
 	size_t faceCount = faceStream.size();
 	faces.reserve( faceCount );
 	// write faces
@@ -82,7 +82,7 @@ std::pair<std::vector<Eigen::Vector<Real,3> >, std::vector<Eigen::Vector<int,3> 
 		ply_face.nr_vertices = int( polygon.size() );
 		ply_face.vertices = new int[ polygon.size() ];
 		for( int j=0 ; j<int(polygon.size()) ; j++ ) ply_face.vertices[j] = (int)polygon[j];
-		faces.push_back( Eigen::Vector<int,3>( ply_face.vertices[0] , ply_face.vertices[1] , ply_face.vertices[2] ) );
+		faces.push_back( Eigen::Matrix<int,3,1>( ply_face.vertices[0] , ply_face.vertices[1] , ply_face.vertices[2] ) );
 		delete[] ply_face.vertices;
 	}
 
@@ -91,7 +91,7 @@ std::pair<std::vector<Eigen::Vector<Real,3> >, std::vector<Eigen::Vector<int,3> 
 
 
 template< class Real , unsigned int Dim , unsigned int FEMSig , typename AuxDataFactory >
-std::pair< std::vector<Eigen::Vector<Real,3> >, std::vector<Eigen::Vector<int,3> > > PoissonReconWrapped::execute()
+std::pair< std::vector<Eigen::Matrix<Real,3,1> >, std::vector<Eigen::Matrix<int,3,1> > > PoissonReconWrapped::execute()
 {
 	static const bool HasAuxData = !std::is_same< AuxDataFactory , VertexFactory::EmptyFactory< Real > >::value;
 
@@ -146,13 +146,13 @@ std::pair< std::vector<Eigen::Vector<Real,3> >, std::vector<Eigen::Vector<int,3>
 		typedef InputDataStream< SampleType > _InputPointStream;
 		_InputPointStream &pointStream;
 		size_t counter = 0;
-		const std::vector<Eigen::Vector<Real, 3> > &points;
-		const std::vector<Eigen::Vector<Real, 3> > &normals;
+		const std::vector<Eigen::Matrix<Real,3,1> > &points;
+		const std::vector<Eigen::Matrix<Real,3,1> > &normals;
 
 		_InputSampleStream( 
 			_InputPointStream &pointStream
-			, const std::vector<Eigen::Vector<Real, 3> > &points
-			, const std::vector<Eigen::Vector<Real, 3> > &normals
+			, const std::vector<Eigen::Matrix<Real,3,1> > &points
+			, const std::vector<Eigen::Matrix<Real,3,1> > &normals
 			) : pointStream( pointStream )
 			, points(points)
 			, normals(normals)
@@ -196,12 +196,13 @@ std::pair< std::vector<Eigen::Vector<Real,3> >, std::vector<Eigen::Vector<int,3>
 
 
 PoissonReconWrapped::PoissonReconWrapped(
-	const std::vector< Eigen::Vector<Real, 3> > &points
-	,const std::vector< Eigen::Vector<Real, 3> > &normals
+	const std::vector< Eigen::Matrix<Real,3,1> > &points
+	,const std::vector< Eigen::Matrix<Real,3,1> > &normals
 	,unsigned int depth
 	,unsigned int adaptive_depth
 	,double scale
 	,double min_samples_per_node
+	,bool use_confidence
 	,double interpolation_weight
 	,unsigned int gauss_seidel_iterations
 	):
@@ -222,8 +223,16 @@ PoissonReconWrapped::PoissonReconWrapped(
 	sParams_.outputDensity = false;
 	sParams_.exactInterpolation = false;
 	sParams_.showResidual = false;
-	sParams_.confidence = (Real)0.0;
-	sParams_.confidenceBias = (Real)0.0;
+	if (use_confidence)
+	{
+		sParams_.confidence = (Real)1.0;
+		sParams_.confidenceBias = (Real)0.5;
+	}
+	else
+	{
+		sParams_.confidence = (Real)0.0;
+		sParams_.confidenceBias = (Real)0.0;
+	}
 	sParams_.lowDepthCutOff = (Real)0.0;
 	sParams_.width = (Real)0.0;
 	sParams_.cgSolverAccuracy = (Real)0.001;
@@ -236,7 +245,7 @@ PoissonReconWrapped::PoissonReconWrapped(
 	sParams_.alignDir = 2;
 }
 
-std::pair<std::vector<Eigen::Vector<Real,3> >, std::vector<Eigen::Vector<int,3> > > PoissonReconWrapped::reconstruct()
+std::pair<std::vector<Eigen::Matrix<Real,3,1> >, std::vector<Eigen::Matrix<int,3,1> > > PoissonReconWrapped::reconstruct()
 {
 	Timer timer;
 	ThreadPool::Init( (ThreadPool::ParallelType)ThreadPool::THREAD_POOL , std::thread::hardware_concurrency() );

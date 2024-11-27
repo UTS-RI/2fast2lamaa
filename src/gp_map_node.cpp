@@ -49,7 +49,7 @@ class GpMapNode: public rclcpp::Node
 
             double voxel_size = readRequiredFieldDouble(this, "voxel_size");
             options.cell_size = voxel_size;
-            downsample_size_ = 3.0 * voxel_size;
+            downsample_size_ = readFieldDouble(this, "voxel_size_factor_for_registration", 5.0) * voxel_size;
             half_voxel_size_sq_ = std::pow(voxel_size / 2.0,2);
             options.neighborhood_size = readRequiredFieldInt(this, "neighbourhood_size");
 
@@ -101,6 +101,7 @@ class GpMapNode: public rclcpp::Node
             options.output_mesh = readFieldBool(this, "output_mesh", false);
             options.clean_mesh_threshold = readFieldDouble(this, "clean_mesh_threshold", 2.0*voxel_size);
             options.meshing_point_per_node = readFieldDouble(this, "meshing_point_per_node", 2.0);
+            options.poisson_weighted = readFieldBool(this, "poisson_weighted", false);
 
 
             pc_type_internal_ = readFieldBool(this, "point_cloud_internal_type", false);
@@ -130,8 +131,6 @@ class GpMapNode: public rclcpp::Node
             map_publish_thread_ = std::make_unique<std::thread>(&GpMapNode::mapPublishThread, this);
 
             query_dist_field_srv_ = this->create_service<ffastllamaa::srv::QueryDistField>("/query_dist_field", std::bind(&GpMapNode::queryDistFieldCallback, this, std::placeholders::_1, std::placeholders::_2));
-
-            DEBUG_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/DEBUG", 10);
 
         }
 
@@ -175,7 +174,6 @@ class GpMapNode: public rclcpp::Node
         rclcpp::Service<ffastllamaa::srv::QueryDistField>::SharedPtr query_dist_field_srv_;
 
 
-        rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr DEBUG_pub_;
 
 
 
@@ -304,12 +302,8 @@ class GpMapNode: public rclcpp::Node
                     else
                     {
                         std::tuple<Vec3, Vec3, int>& temp = pts_map[idx];
-                        double dist = (pt.vec3() - std::get<0>(temp)).squaredNorm();
-                        if(dist < half_voxel_size_sq_)
-                        {
-                            std::get<1>(temp) = std::get<1>(temp) + pt.vec3();
-                            std::get<2>(temp)++;
-                        }
+                        std::get<1>(temp) = std::get<1>(temp) + pt.vec3();
+                        std::get<2>(temp)++;
                     }
                 }
                 std::vector<Vec3> downsampled_pts;
@@ -367,12 +361,6 @@ class GpMapNode: public rclcpp::Node
             sw.start();
             // Add the points to the map
             map_->addPts(pts, current_pose_);
-
-            std::vector<Pointd> DEBUG_pts = map_->DEBUG_points_to_remove_;
-            // Publish DEBUG points
-            sensor_msgs::msg::PointCloud2 DEBUG_msg = ptsVecToPointCloud2MsgInternal(DEBUG_pts, "map", this->now());
-            DEBUG_pub_->publish(DEBUG_msg);
-
 
             map_mutex_.unlock();
 

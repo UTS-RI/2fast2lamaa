@@ -43,11 +43,12 @@ DAMAGE.
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #pragma GCC diagnostic ignored "-Wreorder"
-#pragma GCC diagnostic ignored "-Woverloaded-virtual="
+#pragma GCC diagnostic ignored "-Wpedantic"
 #pragma GCC diagnostic ignored "-Wdelete-non-virtual-dtor"
 #pragma GCC diagnostic ignored "-Wclass-memaccess"
 #pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #pragma GCC diagnostic ignored "-Wtype-limits"
+
 
 #include "PreProcessor.h"
 #include "Reconstructors.h"
@@ -76,7 +77,7 @@ class PoissonReconWrapped
 
 
 		template< typename Real , unsigned int Dim , unsigned int FEMSig , bool HasGradients , bool HasDensity >
-		std::pair<std::vector<Eigen::Vector<Real,3> >, std::vector<Eigen::Vector<int,3> > > getMesh
+		std::pair<std::vector<Eigen::Matrix<Real,3,1> >, std::vector<Eigen::Matrix<int,3,1> > > getMesh
 		(
 			Reconstructor::Implicit< Real , Dim , FEMSig > &implicit ,
 			const Reconstructor::LevelSetExtractionParameters &meParams
@@ -84,24 +85,25 @@ class PoissonReconWrapped
 
 
 		template< class Real , unsigned int Dim , unsigned int FEMSig , typename AuxDataFactory >
-		std::pair<std::vector<Eigen::Vector<Real,3> >, std::vector<Eigen::Vector<int,3> > > execute();
+		std::pair<std::vector<Eigen::Matrix<Real,3,1> >, std::vector<Eigen::Matrix<int,3,1> > > execute();
 
-		const std::vector< Eigen::Vector<Real, 3> >& points_;
-		const std::vector< Eigen::Vector<Real, 3> >& normals_;
+		const std::vector< Eigen::Matrix<Real, 3,1> >& points_;
+		const std::vector< Eigen::Matrix<Real, 3,1> >& normals_;
 
 	public:
 		PoissonReconWrapped(
-			const std::vector< Eigen::Vector<Real, 3> > &points
-			,const std::vector< Eigen::Vector<Real, 3> > &normals
+			const std::vector< Eigen::Matrix<Real, 3,1> > &points
+			,const std::vector< Eigen::Matrix<Real, 3,1> > &normals
 			,unsigned int depth = 12
 			,unsigned int adaptive_depth = 5
 			,double scale = 1.1
 			,double min_samples_per_node = 2.0
+			,bool use_confidence = false
 			,double interpolation_weight = 4.0
 			,unsigned int gauss_seidel_iterations = 8
 			);
 
-		std::pair<std::vector<Eigen::Vector<Real,3> >, std::vector<Eigen::Vector<int,3> > > reconstruct();
+		std::pair<std::vector<Eigen::Matrix<Real,3,1> >, std::vector<Eigen::Matrix<int,3,1> > > reconstruct();
 };
 
 

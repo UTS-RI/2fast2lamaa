@@ -72,6 +72,10 @@ struct PointTemplated
     int type = 0;
     int scan_id = 0;
     unsigned char dynamic = 2;
+    bool has_color = false;
+    uint8_t r = 0;
+    uint8_t g = 0;
+    uint8_t b = 0;
 
 
     PointTemplated(const T _x, const T _y, const T _z, const double _t, const float _intensity=0.0, const int _channel=0, const int _type=0, const int _scan_id=0, const unsigned char _dynamic=2)
