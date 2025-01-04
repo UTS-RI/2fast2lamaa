@@ -11,6 +11,12 @@ LidarOdometryNode::LidarOdometryNode()
     params.min_feature_dist = readFieldDouble(this, "min_feature_dist", 0.05);
     params.max_feature_dist = readFieldDouble(this, "max_feature_dist", 0.5);
     params.nb_scans_per_submap = readFieldInt(this, "nb_scans_per_submap", 2);
+    params.id_scan_to_publish = readFieldInt(this, "id_scan_to_publish", 1);
+    if (params.id_scan_to_publish < 0 || params.id_scan_to_publish >= params.nb_scans_per_submap)
+    {
+        RCLCPP_ERROR(this->get_logger(), "id_scan_to_publish must be between 0 and nb_scans_per_submap-1");
+        throw std::invalid_argument("Invalid parameter");
+    }
     params.state_frequency = readFieldDouble(this, "state_freq", 100.0);
     acc_in_m_s2_ = readFieldBool(this, "acc_in_m_per_s2", true);
     invert_imu_ = readFieldBool(this, "invert_imu", true);
@@ -38,6 +44,7 @@ LidarOdometryNode::LidarOdometryNode()
 
     odom_pub_ = this->create_publisher<geometry_msgs::msg::TransformStamped>("/undistortion_delta_transform", 10);
     global_odom_pub_ = this->create_publisher<geometry_msgs::msg::TransformStamped>("/undistortion_pose", 10);
+    odom_twist_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("/end_of_scan_odom", 10);
     pc_pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/lidar_scan_undistorted", 10);
 
     if(params.dynamic_filtering)
@@ -128,6 +135,50 @@ void LidarOdometryNode::publishDeltaTransform(const double t, const Vec3& dp, co
     br_->sendTransform(delta_trans);
     odom_pub_->publish(delta_trans);
     mutex_br_.unlock();
+}
+void LidarOdometryNode::publishGlobalOdom(const double t, const Vec3& pos, const Vec3& rot, const Vec3& vel, const Vec3& ang_vel)
+{
+    rclcpp::Time new_time = first_t_ + rclcpp::Duration::from_seconds(t);
+
+    nav_msgs::msg::Odometry odom_msg;
+    odom_msg.header.stamp = new_time;
+    odom_msg.header.frame_id = "odom";
+    odom_msg.child_frame_id = "lidar";
+    odom_msg.pose.pose.position.x = pos[0];
+    odom_msg.pose.pose.position.y = pos[1];
+    odom_msg.pose.pose.position.z = pos[2];
+
+    Eigen::AngleAxisd aa = Eigen::AngleAxisd(rot.norm(), rot.normalized());
+    Eigen::Quaterniond q(aa);
+    odom_msg.pose.pose.orientation.x = q.x();
+    odom_msg.pose.pose.orientation.y = q.y();
+    odom_msg.pose.pose.orientation.z = q.z();
+    odom_msg.pose.pose.orientation.w = q.w();
+
+    odom_msg.twist.twist.linear.x = vel[0];
+    odom_msg.twist.twist.linear.y = vel[1];
+    odom_msg.twist.twist.linear.z = vel[2];
+
+    odom_msg.twist.twist.angular.x = ang_vel[0];
+    odom_msg.twist.twist.angular.y = ang_vel[1];
+    odom_msg.twist.twist.angular.z = ang_vel[2];
+
+    for (size_t i = 0; i < 36; ++i)
+    {
+        if (i % 6 == 0)
+        {
+            odom_msg.pose.covariance[i] = 1;
+            odom_msg.twist.covariance[i] = 1;
+        }
+        else
+        {
+            odom_msg.pose.covariance[i] = 0.0;
+            odom_msg.twist.covariance[i] = 0.0;
+        }
+    }
+
+    odom_twist_pub_->publish(odom_msg);
+
 }
 
 void LidarOdometryNode::publishPc(const double t, const std::vector<Pointf>& pc)

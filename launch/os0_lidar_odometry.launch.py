@@ -53,6 +53,7 @@ def generate_launch_description():
             ],
             parameters=[
                 {"nb_scans_per_submap": 3},
+                {"id_scan_to_publish": 1},
                 {"max_feature_dist": 1.0},
                 {"state_freq": 1000.0},
                 {"publish_all_scans": False},

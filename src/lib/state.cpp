@@ -379,23 +379,55 @@ std::tuple<std::pair<Vec3, Vec3>,
 
 
 // Query the linear (first) and angular (second) velocity at the query time
-// WARNING: the angular velocity is only valid if the state was initialized without IMU data
-std::pair<Vec3, Vec3> State::queryVel(
+std::pair<Vec3, Vec3> State::queryTwist(
         const double query_time
-        , const Vec3& arg0
-        , const Vec3& arg1
-        , const Vec3& arg2
-        , const Vec3& arg3
+        , const Vec3& acc_bias
+        , const Vec3& gyr_bias
+        , const Vec3& gravity
+        , const Vec3& vel
         , const double dt
         ) const
 {
     std::pair<Vec3, Vec3> query_vel;
 
-    double eps = 1e-6;
-    auto pose_0 = query(query_time, arg0, arg1, arg2, arg3, dt);
-    auto pose_1 = query(query_time+eps, arg0, arg1, arg2, arg3, dt);
-    query_vel.first = (pose_1.first - pose_0.first) / eps;
-    query_vel.second = Vec3::Zero();
+    // Get the pose at the state time
+    std::vector<std::tuple<Vec3, Mat3, Vec3> > state_pose(nb_state_);
+    for(int i = 0; i < nb_state_; ++i)
+    {
+        const ugpm::PreintMeas& preint = preint_meas_.at(i);
+
+        Mat3 R = preint.delta_R * ugpm::expMap(preint.d_delta_R_d_bw * gyr_bias + preint.d_delta_R_d_t * dt);
+        Vec3 p = preint.delta_p + preint.d_delta_p_d_bf * acc_bias + preint.d_delta_p_d_bw * gyr_bias + preint.d_delta_p_d_t * dt + vel*preint.dt + gravity*preint.dt_sq_half;
+        Vec3 v = vel + preint.delta_v + preint.d_delta_v_d_bf * acc_bias + preint.d_delta_v_d_bw * gyr_bias + preint.d_delta_v_d_t * dt + gravity*preint.dt;
+        state_pose.at(i) = {p, R, v};
+    }
+
+    // Compute the pose at the query time as a linear interpolation of the state poses
+    int state_id = std::floor((query_time - state_time_.at(0)) / state_period_);
+    if(state_id < 0)
+    {
+        state_id = 0;
+    }
+    else if(state_id >= nb_state_-1)
+    {
+        state_id = nb_state_-2;
+    }
+    double t0 = state_time_.at(state_id);
+    double t1 = state_time_.at(state_id+1);
+    double alpha = (query_time - t0) / (t1 - t0);
+
+    const Vec3& p0 = std::get<0>(state_pose.at(state_id));
+    const Vec3& p1 = std::get<0>(state_pose.at(state_id+1));
+    const Mat3& R0 = std::get<1>(state_pose.at(state_id));
+    const Mat3& R1 = std::get<1>(state_pose.at(state_id+1));
+    const Vec3& v0 = std::get<2>(state_pose.at(state_id));
+    const Vec3& v1 = std::get<2>(state_pose.at(state_id+1));
+
+    Vec3 temp_vel = v0 + alpha * (v1 - v0);
+    Vec3 delta_r = ugpm::logMap(R0.transpose() * R1);
+    Mat3 temp_R = R0 * ugpm::expMap(delta_r * alpha);
+    query_vel.first = temp_R.transpose() * temp_vel;
+    query_vel.second = delta_r / (t1 - t0);
 
     return query_vel;
 }

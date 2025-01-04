@@ -894,7 +894,7 @@ void LidarOdometry::prepareSubmap(const State state, std::vector<std::shared_ptr
     sw.start();
 
     
-    int mid_id = int(params_.nb_scans_per_submap/2);
+    int mid_id = params_.id_scan_to_publish; //int(params_.nb_scans_per_submap/2);
     double mid_t = temp_pc_t.at(mid_id);
 
     node_->publishTransform(mid_t, current_pos_, current_rot_);
@@ -918,6 +918,11 @@ void LidarOdometry::prepareSubmap(const State state, std::vector<std::shared_ptr
     auto [increment_pos, increment_rot] = combineTransforms(inv_mid_pos, inv_mid_rot, next_pos, next_rot);
 
     std::tie(current_pos_, current_rot_) = combineTransforms(current_pos_, current_rot_, increment_pos, increment_rot);
+
+    // Publish the odometry at the end of the scan
+    auto [twist_linear, twist_angular] = state.queryTwist(temp_next_time, state_blocks_[0], state_blocks_[1], state_blocks_[2], state_blocks_[3], time_offset_);
+
+    node_->publishGlobalOdom(temp_next_time, current_pos_, current_rot_, twist_linear, twist_angular);
 
 
     node_->publishDeltaTransform(mid_t, increment_pos, increment_rot);

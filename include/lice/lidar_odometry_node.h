@@ -9,6 +9,7 @@
 
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include "geometry_msgs/msg/transform_stamped.hpp"
+#include "nav_msgs/msg/odometry.hpp"
 #include "tf2_ros/transform_broadcaster.h"
 #include "sensor_msgs/msg/imu.hpp"
 #include <message_filters/subscriber.h>
@@ -27,6 +28,7 @@ class LidarOdometryNode : public rclcpp::Node
         void publishDeltaTransform(const double t, const Vec3& dp, const Vec3& dr);
         void publishPc(const double t, const std::vector<Pointf>& pc);
         void publishPcFiltered(const double t, const std::vector<Pointf>& pc_static, const std::vector<Pointf>& pc_dynamic, const std::vector<Pointf>& pc_unsure);
+        void publishGlobalOdom(const double t, const Vec3& pos, const Vec3& rot, const Vec3& vel, const Vec3& ang_vel);
 
     private:
         std::shared_ptr<LidarOdometry> lidar_odometry_;
@@ -40,6 +42,7 @@ class LidarOdometryNode : public rclcpp::Node
 
         rclcpp::Publisher<geometry_msgs::msg::TransformStamped>::SharedPtr odom_pub_;
         rclcpp::Publisher<geometry_msgs::msg::TransformStamped>::SharedPtr global_odom_pub_;
+        rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_twist_pub_;
         rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pc_pub_;
 
 

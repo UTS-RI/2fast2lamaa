@@ -27,6 +27,7 @@ struct LidarOdometryParams
     double min_feature_dist = 0.05;
     double max_feature_dist = 0.5;
     int nb_scans_per_submap = 2;
+    int id_scan_to_publish = 1;
     double state_frequency = 10;
     double g = 9.80;
     double calib_px = 0.0;

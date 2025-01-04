@@ -73,13 +73,12 @@ class State
 
 
         // Query the linear (first) and angular (second) velocity at the query time
-        // WARNING: the angular velocity is only valid if the state was initialized without IMU data
-        std::pair<Vec3, Vec3> queryVel(
+        std::pair<Vec3, Vec3> queryTwist(
                 const double query_time
-                , const Vec3& arg0
-                , const Vec3& arg1
-                , const Vec3& arg2
-                , const Vec3& arg3
+                , const Vec3& acc_bias
+                , const Vec3& gyr_bias
+                , const Vec3& gravity
+                , const Vec3& vel
                 , const double dt
                 ) const;
 

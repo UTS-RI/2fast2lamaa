@@ -71,6 +71,19 @@ Then you can run the package using the following command:
 ros2 launch ffastllamaa os0_lidar_odometry.launch.py
 ```
 
+There are some parameters in the launch file.
+The names or the comments should help you understand what they are for.
+I just want to highlight the parameters `nb_scan_per_submap` and `id_scan_to_publish`: the first one is the number of scans used in the window to compute the undistortion and potential dynamic object filtering.
+The second one is the ID of the scan within the submap/window that will be published and used to query the dynamic filtering.
+By default the middle scan is used but you can lower the latency of the odometry output by setting `id_scan_to_publish =  nb_scan_per_submap - 1`.
+However, not using the middle scan might affect the overall performance of the framework.
+
+Among the various topics published by the package:
+- `/undistortion_pose`: pose of the IMU at the start of the last undistorted scan (corresponding to the `id_scan_to_publish` parameter), `geometry_msgs::msg::TransformStamped`.
+- `/end_of_scan_odom`: pose of the IMU at the end of the last undistorted scan, `nav_msgs::msg::Odometry`.
+- `/lidar_scan_undistorted`: the undistorted scan at time of the beginning of the last undistorted scan, `sensor_msgs::msg::PointCloud2`.
+- `/lidar_static`: the undistorted scan after the dynamic object and unreliable points filtering, `sensor_msgs::msg::PointCloud2`.
+
 __Please note that the visualisation creates some additional computation and block some mutexes. For optimal performance, deactivate the various visualisations.__
 
 
