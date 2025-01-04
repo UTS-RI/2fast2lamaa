@@ -1,5 +1,7 @@
 # 2Fast-2Lamaa
 
+__WARNING: There might be developments/features in the ROS2 version (main branch) that are not necessarily integrated into this ROS1 version if not requested.__
+
 This repository contains the code of a lidar-inertial localisation and mapping framework named 2Fast-2Lamaa.
 It is built upon the lidar-inertial undistortion work presented at IROS 2024 (more details [here](https://uts-ri.github.io/lidar_inertial_motion_correction/)).
 __If you are looking to use the undistortion-related code from our IROS publication, please refer to the [Undistortion](#undistortion-iros-2024) section.__
