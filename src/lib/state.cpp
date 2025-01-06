@@ -416,8 +416,6 @@ std::pair<Vec3, Vec3> State::queryTwist(
     double t1 = state_time_.at(state_id+1);
     double alpha = (query_time - t0) / (t1 - t0);
 
-    const Vec3& p0 = std::get<0>(state_pose.at(state_id));
-    const Vec3& p1 = std::get<0>(state_pose.at(state_id+1));
     const Mat3& R0 = std::get<1>(state_pose.at(state_id));
     const Mat3& R1 = std::get<1>(state_pose.at(state_id+1));
     const Vec3& v0 = std::get<2>(state_pose.at(state_id));
