@@ -195,6 +195,11 @@ struct DataAssociation
             Vec3 v2 = targets[0] - targets[2];
             Vec3 n = v1.cross(v2);
             double n_norm = n.norm();
+            if (n_norm < 1e-6)
+            {
+                output.setZero();
+                return output;
+            }
             Vec3 v3 = feature - targets[0];
             Vec3 nu = n / n_norm;
             Vec3 v21 = targets[2] - targets[1];
@@ -224,7 +229,13 @@ struct DataAssociation
             Vec3 v1 = feature - targets[0];
             Vec3 v2 = feature - targets[1];
             Vec3 v3 = targets[1] - targets[0];
-            double v3_norm_inv = 1.0/v3.norm();
+            double v3_norm = v3.norm();
+            if (v3_norm < 1e-6)
+            {
+                output.setZero();
+                return output;
+            }
+            double v3_norm_inv = 1.0/v3_norm;
             Vec3 n = v1.cross(v2);
 
             Mat3_6 temp_d_vector_prod;
