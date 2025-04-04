@@ -458,7 +458,7 @@ Mat4 MapDistField::registerPts(const std::vector<Vec3>& pts, const Mat4& pose, c
     options.function_tolerance = 1e-4;
     ceres::Solver::Summary summary;
     ceres::Solve(options, &problem, &summary);
-    std::cout << summary.FullReport() << std::endl;
+    std::cout << summary.BriefReport() << std::endl;
 
 
     if(!approximate)
@@ -467,9 +467,9 @@ Mat4 MapDistField::registerPts(const std::vector<Vec3>& pts, const Mat4& pose, c
 
         options.max_num_iterations = 2;
         options.function_tolerance = 1e-4;
-        options.minimizer_progress_to_stdout = true;
+        options.minimizer_progress_to_stdout = false;
         ceres::Solve(options, &problem, &summary);
-        std::cout << summary.FullReport() << std::endl;
+        std::cout << summary.BriefReport() << std::endl;
     }
 
 
@@ -634,9 +634,10 @@ void MapDistField::addPts(const std::vector<Pointd>& pts, const Mat4& pose)
                 if((dists[el_idx][az_idx] > 0) && (polar[0] > min_range_threshold) && (dists[el_idx][az_idx]-dist_threshold > polar[0]))
                 {
                     map_pts_to_remove.push_back(neighbor);
-                    std::cout << "Removing point with distance: " << polar[0] << " and scan distance: " << dists[el_idx][az_idx] << std::endl;
                 }
             }
+
+            std::cout << "Number of points to remove (free space carving): " << map_pts_to_remove.size() << std::endl;
 
 
             // Remove the points from the map

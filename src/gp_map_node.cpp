@@ -148,6 +148,10 @@ class GpMapNode: public rclcpp::Node
         double key_framing_rot_thr_ = 0.1;
         double key_framing_time_thr_ = 1.0;
 
+        double time_process_pc_sum_ = 0.0;
+        int time_process_pc_count_ = 0;
+        double time_process_pc_max_ = 0.0;
+
         double min_range_ = 1.0;
         double max_range_ = 1000.0;
 
@@ -228,11 +232,12 @@ class GpMapNode: public rclcpp::Node
             StopWatch sw;
             sw.start();
             std::vector<double> dists = map_->queryDistField(query_pts);
-            DEBUG_query_time_sum_ += sw.stop();
+            double temp_time = sw.stop();
+            DEBUG_query_time_sum_ += temp_time;
             map_mutex_.unlock();
             DEBUG_query_time_count_ += request->num_pts;
             RCLCPP_INFO(this->get_logger(), "Average query time per point (API): %f", DEBUG_query_time_sum_/DEBUG_query_time_count_);
-            sw.print("Query time (API) with" + std::to_string(request->num_pts) + " points");
+            RCLCPP_INFO(this->get_logger(), "Query time (API) with %d points: %f ms", request->num_pts, temp_time);
             for(double dist: dists)
             {
                 response->dists.push_back(dist);
@@ -326,12 +331,12 @@ class GpMapNode: public rclcpp::Node
 
                 sw.stop();
                 map_mutex_.lock();
+                sw.start();
                 if(!with_prior_)
                 {
                     current_pose_ = map_->registerPts(downsampled_pts, current_pose_, pts[0].t, true, false);
                     prior_ = current_pose_;
                 }
-                sw.start();
                 current_pose_ = map_->registerPts(downsampled_pts, prior_, pts[0].t, approximate_);
                 prior_ = current_pose_;
                 key_framing_time_cumulated_ = 0.0;
@@ -346,10 +351,10 @@ class GpMapNode: public rclcpp::Node
                 odom_map_correction_msg.transform = mat4ToTransform(odom_map_correction);
                 odom_map_correction_pub_->publish(odom_map_correction_msg);
 
-                DEBUG_registration_time_sum_ += sw.stop();
+                double temp_time = sw.stop();
+                DEBUG_registration_time_sum_ += temp_time;
                 DEBUG_registration_time_count_++;
-                sw.print("Registering time");
-                RCLCPP_INFO(this->get_logger(), "------- Average registration time: %f ms", DEBUG_registration_time_sum_/DEBUG_registration_time_count_);
+                RCLCPP_INFO(this->get_logger(), "Registration time: %f ms, avg: %f ms", temp_time, DEBUG_registration_time_sum_/DEBUG_registration_time_count_);
             }
             else
             {
@@ -364,8 +369,8 @@ class GpMapNode: public rclcpp::Node
 
             map_mutex_.unlock();
 
-            sw.stop();
-            sw.print("Adding points to map time");
+            double temp_time = sw.stop();
+            RCLCPP_INFO(this->get_logger(), "Time to add points to map: %f ms", temp_time);
             counter_++;
             last_pc_epoch_time_ = std::chrono::high_resolution_clock::now();
         }
@@ -373,6 +378,8 @@ class GpMapNode: public rclcpp::Node
 
         void pcPriorCallback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr pc_msg, const geometry_msgs::msg::TransformStamped::ConstSharedPtr odom_msg)
         {
+            StopWatch sw;
+            sw.start();
             if(first_)
             {
                 last_pc_time_ = pc_msg->header.stamp;
@@ -398,11 +405,18 @@ class GpMapNode: public rclcpp::Node
             }
             updateMap(pts, transformToMat4(odom_msg->transform), pc_msg->header.stamp);
             last_pc_time_ = pc_msg->header.stamp;
+
+            double time_ms = sw.stop();
+            time_process_pc_sum_ += time_ms;
+            time_process_pc_count_++;
+            time_process_pc_max_ = std::max(time_process_pc_max_, time_ms);
+            RCLCPP_INFO(this->get_logger(), "Total time to process point cloud: %f ms, avg: %f ms, max: %f ms", time_ms, time_process_pc_sum_/time_process_pc_count_, time_process_pc_max_);
         }
 
 
         void pcCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg)
         {
+            StopWatch sw;
             if(first_)
             {
                 last_pc_time_ = msg->header.stamp;
@@ -428,6 +442,12 @@ class GpMapNode: public rclcpp::Node
             }
             updateMap(pts, current_pose_, msg->header.stamp);
             last_pc_time_ = msg->header.stamp;
+
+            double time_ms = sw.stop();
+            time_process_pc_sum_ += time_ms;
+            time_process_pc_count_++;
+            time_process_pc_max_ = std::max(time_process_pc_max_, time_ms);
+            RCLCPP_INFO(this->get_logger(), "Total time to process point cloud: %f ms, avg: %f ms, max: %f ms", time_ms, time_process_pc_sum_/time_process_pc_count_, time_process_pc_max_);
         }
         
 

@@ -72,7 +72,11 @@ void LidarOdometry::run()
         mutex_.unlock();
         if(run_optimise)
         {
+            StopWatch sw;
+            sw.start();
             optimise();
+            sw.stop();
+            sw.print("Lidar odometry overall optimisation time");
         }
         std::this_thread::sleep_for(std::chrono::milliseconds(int(kPullPeriod*1000)));
     }
@@ -123,7 +127,7 @@ LidarOdometry::LidarOdometry(const LidarOdometryParams& params, LidarOdometryNod
     state_calib_[5] = params_.calib_py;
     state_calib_[6] = params_.calib_pz;
 
-    loss_function_ = NULL; //new ceres::CauchyLoss(0.05);
+    loss_function_ = new ceres::CauchyLoss(1.0);
 
     imu_data_.acc_var = params_.acc_std*params_.acc_std;
     imu_data_.gyr_var = params_.gyr_std*params_.gyr_std;
@@ -808,9 +812,6 @@ void LidarOdometry::createProblemAssociateAndOptimise(
     //options.check_gradients = true;
 
 
-    StopWatch sw;
-    sw.start();
-
     // Project the features to the state times
     std::vector<std::shared_ptr<std::vector<Pointd> > > projected_features = projectPoints(
         pts,
@@ -818,26 +819,16 @@ void LidarOdometry::createProblemAssociateAndOptimise(
         state_blocks_,
         time_offset_,
         state_calib_);
-    sw.stop();
-    sw.print("Projection: ");
     
-    sw.reset();
-    sw.start();
     // Scan to scan correspondences
     std::vector<DataAssociation> data_associations = getAllAssociations(types, projected_features);
 
     //visualiseDataAssociation(data_associations, "Data association "+ std::to_string(ros::Time::now().toSec()) +"  " + std::to_string(pc_t_[0]) + " scan to scan");
 
-    sw.stop();
-    sw.print("Data association: ");
-    std::cout << "Nb data associations: " << data_associations.size() << std::endl;
+    int temp_nb_data_associations = data_associations.size();
 
-    sw.reset();
-    sw.start();
     data_associations = filterDataAssociations(data_associations, projected_features);
-    sw.stop();
-    sw.print("Association filtering");
-    std::cout << "Nb data associations after filtering: " << data_associations.size() << std::endl;
+    std::cout << "Nb data associations (before / after filtering): " << temp_nb_data_associations << " / " << data_associations.size() << std::endl;
 
     //visualiseDataAssociation(data_associations, "Data association after filtering "+ std::to_string(ros::Time::now().toSec()) +"  " + std::to_string(pc_t_[0]) + " scan to scan");
 
@@ -852,7 +843,7 @@ void LidarOdometry::createProblemAssociateAndOptimise(
     // Solve the problem
     ceres::Solver::Summary summary;
     ceres::Solve(options, &problem, &summary);
-    std::cout << summary.FullReport() << std::endl;
+    std::cout << summary.BriefReport() << std::endl;
 
 
 }
@@ -1050,8 +1041,12 @@ void LidarOdometry::prepareSubmap(const State state, std::vector<std::shared_ptr
 
     if(params_.dynamic_filtering && compute)
     {
+        StopWatch sw2;
+        sw2.start();
         auto [static_pc, dynamic_pc, unsure_pc] = dynamicFiltering(projected_pc, params_.dynamic_filtering_threshold, params_.dynamic_filtering_voxel_size);
         node_->publishPcFiltered(mid_t, static_pc, dynamic_pc, unsure_pc);
+        sw2.stop();
+        sw2.print("Total dynamic filtering: ");
     }
 
     mutex_output_.lock();
@@ -1059,7 +1054,7 @@ void LidarOdometry::prepareSubmap(const State state, std::vector<std::shared_ptr
     mutex_output_.unlock();
 
     sw.stop();
-    sw.print("Prepare submap for later publishing: ");
+    sw.print("Prepare submap and publish (include dynamic filtering): ");
 }
 
 

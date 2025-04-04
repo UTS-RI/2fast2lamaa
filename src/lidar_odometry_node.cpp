@@ -276,6 +276,12 @@ void LidarOdometryNode::accCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
         first_acc_t_ = header_time;
     }
 
+    if(header_time <= last_acc_time_)
+    {
+        return;
+    }
+    last_acc_time_ = header_time;
+
     Vec3 acc;
     acc << msg->linear_acceleration.x, msg->linear_acceleration.y, msg->linear_acceleration.z;
     if(!acc_in_m_s2_)
@@ -302,6 +308,12 @@ void LidarOdometryNode::gyrCallback(const sensor_msgs::msg::Imu::SharedPtr msg)
         first_gyr_ = false;
         first_gyr_t_ = header_time;
     }
+
+    if(header_time <= last_gyr_time_)
+    {
+        return;
+    }
+    last_gyr_time_ = header_time;
 
     Vec3 gyr;
     gyr << msg->angular_velocity.x, msg->angular_velocity.y, msg->angular_velocity.z;

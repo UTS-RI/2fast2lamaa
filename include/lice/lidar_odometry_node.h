@@ -67,6 +67,9 @@ class LidarOdometryNode : public rclcpp::Node
         int scan_count_ = 0;
         bool invert_imu_ = false;
 
+        rclcpp::Time last_gyr_time_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
+        rclcpp::Time last_acc_time_ = rclcpp::Time(0, 0, RCL_ROS_TIME);
+
         bool acc_in_m_s2_ = true;
 
         geometry_msgs::msg::TransformStamped::SharedPtr odom_map_correction_msg_;
