@@ -58,7 +58,6 @@ class LidarFeatureNode : public rclcpp::Node
             std::vector<Pointf> pts = pointCloud2MsgToPtsVecInternalFloat(msg);
 
             has_channel_ = pts[0].channel != kNoChannel;
-            
             // Split the point cloud into channels and remove points too close
             std::vector<std::vector<Pointf> > channels;
             if(!has_channel_ && (channel_elevation_.size() == 0))
@@ -89,7 +88,30 @@ class LidarFeatureNode : public rclcpp::Node
 
             if(first_)
             {
-                median_dt_ = getMedianDt(channels[0]);
+                // Get the median Dt for all channels
+                std::vector<float> dt;
+                for(size_t i = 0; i < channels.size(); ++i)
+                {
+                    dt.push_back(getMedianDt(channels[i]));
+                }
+                std::sort(dt.begin(), dt.end());
+                median_dt_ = dt[dt.size()/2];
+                if(median_dt_ <= 0.0)
+                {
+                    dt.clear();
+                    for(size_t i = 0; i < channels.size(); ++i)
+                    {
+                        dt.push_back(getMeanDt(channels[i]));
+                    }
+                    std::sort(dt.begin(), dt.end());
+                    median_dt_ = dt[dt.size()/2];
+
+                }
+                if(median_dt_ <= 0.0)
+                {
+                    RCLCPP_ERROR(this->get_logger(), "Median dt is zero or negative, cannot compute features");
+                    return;
+                }
                 first_ = false;
             }
 

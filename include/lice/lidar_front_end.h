@@ -86,6 +86,17 @@ inline float getMedianDt(const std::vector<Pointf>& pc)
     return float(dt[dt.size()/2]);
 }
 
+inline float getMeanDt(const std::vector<Pointf>& pc)
+{
+    std::vector<double> dt;
+    for(size_t i = 1; i < pc.size(); ++i)
+    {
+        dt.push_back(pc[i].t - pc[i-1].t);
+    }
+    double sum = std::accumulate(dt.begin(), dt.end(), 0.0);
+    return float(sum/dt.size());
+}
+
 
 // Get intensity features in a point cloud channel
 inline std::tuple<std::vector<Pointf>, std::vector<Pointf>> getIntensityFeatures(const std::vector<Pointf>& pc, const float median_dt, const int win_size = 10)
